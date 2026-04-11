@@ -11,9 +11,16 @@ from app.schemas.brand_schema import AgentResult
 SYSTEM_PROMPT = """You are a Senior Market Intelligence Consultant and Competitive Intelligence Analyst.
 Use Google Search to find real-time data. Your goal is to deliver BOTH a full market landscape AND a competitor battlefield map in a single, comprehensive research pass.
 
+CRITICAL INDUSTRY LOCK RULE:
+- You MUST research ONLY the exact industry and geography stated in the prompt.
+- Direct competitors MUST be companies operating in the SAME business vertical (same product/service category) targeting the SAME customer type in the SAME geography.
+- NEVER include companies from unrelated industries. If the brand is a fintech lender for Indian electronics distributors, competitors must be Indian NBFCs, fintech lenders, or B2B credit providers — NOT consumer brands, retailers, or companies from other sectors.
+- If you are unsure whether a company is a real competitor, skip it.
+- Search queries must include the exact industry and geography to avoid drift.
+
 RESEARCH FRAMEWORK:
-1. MARKET ANALYSIS: Market size (TAM/SAM with CAGR), key trends (2024-2027), target demographics, market gaps, growth drivers.
-2. COMPETITOR MAPPING: Direct competitors (same problem), indirect competitors (different solution), SWOT from the outside, vulnerability mapping (what customers hate about the top players).
+1. MARKET ANALYSIS: Market size (TAM/SAM with CAGR), key trends (2024-2027), target demographics, market gaps, growth drivers — all specific to the stated industry and geography.
+2. COMPETITOR MAPPING: Direct competitors (same problem, same audience, same geography), indirect competitors (different solution, same pain point). SWOT from the outside, vulnerability mapping (what customers hate about the top players).
 3. TREND VELOCITY: Distinguish short-term fads from long-term structural shifts.
 
 Your output must be a JSON object with EXACTLY these two top-level keys:
@@ -94,24 +101,29 @@ async def run(idea_data: dict) -> tuple[AgentResult, AgentResult]:
     primary_audience = audience.get("primary", "") if isinstance(audience, dict) else str(audience)
     geography = audience.get("geography", "Global") if isinstance(audience, dict) else "Global"
 
+    # Build a tight search anchor phrase so Gemini's first search is industry-locked
+    search_anchor = f"{industry} market {geography}".strip()
+
     user_prompt = (
+        f"⚠️ INDUSTRY LOCK: You must research ONLY the following industry and geography. "
+        f"Every competitor, market figure, and trend must belong to this exact vertical.\n"
+        f"INDUSTRY: {industry}\n"
+        f"GEOGRAPHY: {geography}\n"
+        f"BUSINESS MODEL: {business_model}\n\n"
         f"BRAND IDEA: {refined_idea}\n"
-        f"INDUSTRY/CATEGORY: {industry}\n"
-        f"BUSINESS MODEL: {business_model}\n"
         f"CORE PROBLEM SOLVED: {problem}\n"
         f"PRIMARY AUDIENCE: {primary_audience}\n"
-        f"TARGET GEOGRAPHY: {geography}\n"
         f"KEY DIFFERENTIATORS: {', '.join(differentiators)}\n"
-        f"KNOWN COMPETITORS (from idea brief): {competitors_hint}\n\n"
-        f"Search the web for the latest 2024/2025 data on this market and its competitors. "
-        f"Identify market size with CAGR, key trends, top 3-5 direct competitors with their "
-        f"strengths/weaknesses, indirect competitors, target demographics, market gaps, "
-        f"and what customers hate about existing solutions. "
-        f"For each direct competitor, also analyze their VISUAL DESIGN IDENTITY: brand colors and "
-        f"emotional tone, typography choices, logo style, overall visual language, and what makes "
-        f"their design stand out or feel dated. "
-        f"Finally, identify industry-wide design trends and any visual white space (design directions "
-        f"no competitor has claimed) that could be a differentiation opportunity."
+        + (f"KNOWN COMPETITORS TO RESEARCH: {competitors_hint}\n" if competitors_hint else "")
+        + f"\nSearch for: \"{search_anchor} competitors 2024 2025\"\n\n"
+        f"Find the top 3-5 DIRECT competitors — companies in the SAME industry ({industry}), "
+        f"serving the SAME audience ({primary_audience}) in {geography}. "
+        f"DO NOT include companies from any other industry or geography. "
+        f"Identify market size with CAGR, key trends, target demographics, market gaps, "
+        f"and what customers hate about existing solutions in {industry}. "
+        f"For each direct competitor, analyze their VISUAL DESIGN IDENTITY: brand colors, "
+        f"typography, logo style, visual language, and what makes their design stand out or feel dated. "
+        f"Finally, identify industry-wide design trends and visual white space in the {industry} space."
     )
 
     raw = await call_gemini_with_search(

@@ -51,6 +51,11 @@ CRITICAL RULES:
 - Never return empty strings or null values. Always make an informed inference.
 - If the idea is very short (e.g., "an app for dog walkers"), expand it intelligently using your knowledge.
 - If the idea is long and detailed, distill it — don't just copy-paste.
+- INDUSTRY CLASSIFICATION RULE: Classify the industry based on WHAT THE COMPANY DOES, not who its customers are.
+  Example: A company that LENDS MONEY to retailers → industry is "Fintech / NBFC / B2B Lending", NOT "Retail".
+  Example: A company that DELIVERS to restaurants → industry is "Logistics / Last-Mile Delivery", NOT "Food & Beverage".
+  Example: A company that BUILDS SOFTWARE for hospitals → industry is "Health Tech / SaaS", NOT "Healthcare".
+- The `competitive_context` field must name companies in the SAME business (same product/service), not the same customer base.
 - Return ONLY valid JSON. No markdown, no explanation outside the JSON."""
 
 
