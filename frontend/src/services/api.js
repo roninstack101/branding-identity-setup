@@ -27,6 +27,10 @@ export const runFullWorkflow = (projectId) =>
 export const runNextStep = (projectId) =>
   api.post(`/api/brand/project/${projectId}/step`);
 
+// ── Select Brand Name ────────────────────────────────────────────────
+export const selectBrandName = (projectId, brandName) =>
+  api.post(`/api/brand/project/${projectId}/select-name`, { brand_name: brandName });
+
 // ── Regenerate ───────────────────────────────────────────────────────
 export const regenerate = (projectId, agentName, feedback) =>
   api.post('/api/regenerate/', { project_id: projectId, agent_name: agentName, feedback });

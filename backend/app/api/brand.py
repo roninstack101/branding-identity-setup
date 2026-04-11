@@ -27,6 +27,10 @@ from app.workflows.brand_graph import (
 from app.agents.visual_identity_agent import regenerate_variant_svg
 
 
+class SelectNameRequest(BaseModel):
+    brand_name: str
+
+
 class VariantRegenerateRequest(BaseModel):
     variant_index: int
     color_palette: List[str]        # 5 hex strings
@@ -93,6 +97,62 @@ async def run_next_step(project_id: UUID, db: AsyncSession = Depends(get_db)):
         "status": project.status,
         "state": state.model_dump(),
     }
+
+
+# ── Select Brand Name ─────────────────────────────────────────────────
+@router.post("/project/{project_id}/select-name")
+async def select_brand_name(
+    project_id: UUID,
+    body: SelectNameRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Save the user's chosen brand name as a new version of the naming output.
+    All subsequent agents read brand_name from this output, so they will
+    automatically use the selected name."""
+    if not body.brand_name or not body.brand_name.strip():
+        raise HTTPException(400, "brand_name must not be empty")
+
+    project = await db.get(Project, project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    # Fetch latest naming output
+    stmt = (
+        select(AgentOutput)
+        .where(
+            AgentOutput.project_id == project_id,
+            AgentOutput.agent_name == "naming",
+        )
+        .order_by(AgentOutput.version.desc())
+        .limit(1)
+    )
+    row = (await db.execute(stmt)).scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, "Naming output not found. Run the naming step first.")
+
+    # Merge: keep all existing naming data, just override brand_name
+    updated_data = dict(row.output_json)
+    previous_name = updated_data.get("brand_name", "")
+    updated_data["brand_name"] = body.brand_name.strip()
+
+    # Save as a new version so history is preserved
+    max_stmt = select(func.coalesce(func.max(AgentOutput.version), 0)).where(
+        AgentOutput.project_id == project_id,
+        AgentOutput.agent_name == "naming",
+    )
+    current_max = (await db.execute(max_stmt)).scalar() or 0
+
+    new_row = AgentOutput(
+        project_id=project_id,
+        agent_name="naming",
+        output_json=updated_data,
+        explanation=f"Brand name selected by user: '{body.brand_name}' (was '{previous_name}').",
+        version=current_max + 1,
+    )
+    db.add(new_row)
+    await db.commit()
+
+    return {"brand_name": body.brand_name, "version": current_max + 1}
 
 
 # ── Get Project State ─────────────────────────────────────────────────

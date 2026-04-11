@@ -28,7 +28,7 @@ function renderAgentView(key, json, onRegenerate, projectId, agentOutputs) {
     case 'market_research':       return <MarketResearchView   data={json} />;
     case 'competitor_analysis':   return <CompetitorBattlefield data={json} />;
     case 'brand_strategy':        return <BrandStrategyView    data={json} />;
-    case 'naming':                return <NamingCards          data={json} originalName={agentOutputs?.idea_discovery?.output_json?.original_brand_name} />;
+    case 'naming':                return <NamingCards          data={json} originalName={agentOutputs?.idea_discovery?.output_json?.original_brand_name} projectId={projectId} />;
     case 'visual_identity_agent': return (
       <div className="space-y-10">
         <VariantGallery data={json} projectId={projectId} onRegenerate={onRegenerate} />
