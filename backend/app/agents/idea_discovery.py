@@ -20,6 +20,7 @@ EXTRACTION FRAMEWORK:
 Your output must be a JSON object with EXACTLY these keys:
 
 {
+  "original_brand_name": "The exact business/brand name the user mentioned in their idea, or null if they did not mention one. Extract it precisely — do not modify, translate, or invent a name.",
   "refined_idea": "A 2-3 sentence restatement of the idea in professional, clear language. Captures the what, who, and why.",
   "industry_category": "The specific industry vertical (e.g., 'B2B SaaS / HR Tech', 'D2C Health & Wellness', 'Marketplace / Gig Economy')",
   "business_model": "The core business model (e.g., 'Subscription SaaS', 'Marketplace with commission', 'D2C e-commerce', 'Freemium mobile app')",

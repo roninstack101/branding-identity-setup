@@ -22,13 +22,13 @@ const STEPS = [
   { key: 'export_agent',          icon: '📦', label: 'Export' },
 ];
 
-function renderAgentView(key, json, onRegenerate, projectId) {
+function renderAgentView(key, json, onRegenerate, projectId, agentOutputs) {
   if (!json) return null;
   switch (key) {
     case 'market_research':       return <MarketResearchView   data={json} />;
     case 'competitor_analysis':   return <CompetitorBattlefield data={json} />;
     case 'brand_strategy':        return <BrandStrategyView    data={json} />;
-    case 'naming':                return <NamingCards          data={json} />;
+    case 'naming':                return <NamingCards          data={json} originalName={agentOutputs?.idea_discovery?.output_json?.original_brand_name} />;
     case 'visual_identity_agent': return (
       <div className="space-y-10">
         <VariantGallery data={json} projectId={projectId} onRegenerate={onRegenerate} />
@@ -233,7 +233,7 @@ export default function Dashboard({ project, onBack }) {
           {activeStep && activeJson && (
             <div className="space-y-8 animate-fade-in">
               {/* Dedicated component or AgentCard fallback */}
-              {renderAgentView(activeStep, activeJson, handleRegenerate, project.id) || (
+              {renderAgentView(activeStep, activeJson, handleRegenerate, project.id, agentOutputs) || (
                 <AgentCard
                   agentName={activeStep}
                   output={activeOutput}
