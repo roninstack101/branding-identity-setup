@@ -16,7 +16,7 @@ from app.utils.search import web_search
 
 
 # ── Semaphore: max 5 concurrent Groq calls to stay within rate limits ─────────
-_SVG_SEMAPHORE = asyncio.Semaphore(5)
+_SVG_SEMAPHORE = asyncio.Semaphore(3)
 
 
 # ── 10-variant brand identity prompt ──────────────────────────────────────────
@@ -46,7 +46,7 @@ Return this exact JSON structure:
 }
 
 CRITICAL RULES:
-- Generate EXACTLY 10 variants in the "variants" array.
+- Generate EXACTLY 6 variants in the "variants" array.
 - Each variant MUST have a different logo_type. Cover at least 5 different types across: wordmark, lettermark, icon_mark, combination_mark, emblem, abstract_mark, mascot.
 - Each logo_prompt MUST explicitly reference the EXACT hex color codes from that variant's color_palette.
 - For wordmark/lettermark/combination_mark logo types, the logo_prompt MUST include the brand name as text to render.
