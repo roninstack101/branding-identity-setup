@@ -512,7 +512,7 @@ async def run(
         # Existing keys (kept for compatibility with guidelines_agent, UI, etc.)
         "design_style": design_style,
         "mood_keywords": [archetype, "professional", "distinctive", "modern"],
-        "design_trends": design_trends[:4],
+        "design_trends": market_trends[:4],
         "imagery_style": f"Visual identity built around {archetype} archetype with {design_style} direction.",
         "logo_direction": {
             "summary": first_variant.get("logo_prompt", f"A {design_style} logo for {brand_name}.")[:200],
