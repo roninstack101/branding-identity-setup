@@ -151,6 +151,7 @@ async def select_brand_name(
     )
     db.add(new_row)
     await db.commit()
+    print(f"[select-name] project={project_id} saved brand_name='{body.brand_name}' as version {current_max + 1}")
 
     return {"brand_name": body.brand_name, "version": current_max + 1}
 

@@ -72,6 +72,9 @@ async def _get_latest_output(
     db: AsyncSession, project_id: UUID, agent_name: str
 ) -> dict | None:
     """Fetch the latest version of an agent output for a project."""
+    # expire_all forces SQLAlchemy to bypass the session identity-map cache
+    # so we always read the freshest committed row (important for select-name).
+    db.expire_all()
     stmt = (
         select(AgentOutput)
         .where(
@@ -83,6 +86,8 @@ async def _get_latest_output(
     )
     result = await db.execute(stmt)
     row = result.scalar_one_or_none()
+    if agent_name == "naming" and row:
+        print(f"[build_state] naming v{row.version} brand_name={row.output_json.get('brand_name')}")
     return row.output_json if row else None
 
 
