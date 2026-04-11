@@ -101,29 +101,20 @@ async def run(idea_data: dict) -> tuple[AgentResult, AgentResult]:
     primary_audience = audience.get("primary", "") if isinstance(audience, dict) else str(audience)
     geography = audience.get("geography", "Global") if isinstance(audience, dict) else "Global"
 
-    # Build a tight search anchor phrase so Gemini's first search is industry-locked
-    search_anchor = f"{industry} market {geography}".strip()
+    # Keep the prompt short and direct — Gemini search grounding drifts on long prompts
+    competitor_line = f"Start by searching for: {competitors_hint} competitors." if competitors_hint else ""
 
     user_prompt = (
-        f"⚠️ INDUSTRY LOCK: You must research ONLY the following industry and geography. "
-        f"Every competitor, market figure, and trend must belong to this exact vertical.\n"
+        f"Research the following business and return market + competitor data as JSON.\n\n"
         f"INDUSTRY: {industry}\n"
         f"GEOGRAPHY: {geography}\n"
-        f"BUSINESS MODEL: {business_model}\n\n"
-        f"BRAND IDEA: {refined_idea}\n"
-        f"CORE PROBLEM SOLVED: {problem}\n"
-        f"PRIMARY AUDIENCE: {primary_audience}\n"
-        f"KEY DIFFERENTIATORS: {', '.join(differentiators)}\n"
-        + (f"KNOWN COMPETITORS TO RESEARCH: {competitors_hint}\n" if competitors_hint else "")
-        + f"\nSearch for: \"{search_anchor} competitors 2024 2025\"\n\n"
-        f"Find the top 3-5 DIRECT competitors — companies in the SAME industry ({industry}), "
-        f"serving the SAME audience ({primary_audience}) in {geography}. "
-        f"DO NOT include companies from any other industry or geography. "
-        f"Identify market size with CAGR, key trends, target demographics, market gaps, "
-        f"and what customers hate about existing solutions in {industry}. "
-        f"For each direct competitor, analyze their VISUAL DESIGN IDENTITY: brand colors, "
-        f"typography, logo style, visual language, and what makes their design stand out or feel dated. "
-        f"Finally, identify industry-wide design trends and visual white space in the {industry} space."
+        f"BUSINESS: {refined_idea}\n"
+        f"AUDIENCE: {primary_audience}\n\n"
+        f"{competitor_line}\n"
+        f"Search specifically for '{industry} {geography} market size 2024' "
+        f"and '{industry} {geography} top companies competitors 2025'.\n\n"
+        f"Return ONLY companies and market data from the {industry} industry in {geography}. "
+        f"Do not include companies from any other industry."
     )
 
     raw = await call_gemini_with_search(
@@ -134,9 +125,12 @@ async def run(idea_data: dict) -> tuple[AgentResult, AgentResult]:
 
     try:
         combined = json.loads(raw)
-        print(f"[market_competitor_agent] Parsed OK — keys: {list(combined.keys())}")
         ca = combined.get("competitor_analysis", {})
-        print(f"[market_competitor_agent] direct_competitors count: {len(ca.get('direct_competitors', []))}")
+        mr = combined.get("market_research", {})
+        direct = ca.get("direct_competitors", [])
+        print(f"[market_competitor_agent] Parsed OK | industry={industry} | geography={geography}")
+        print(f"[market_competitor_agent] direct_competitors: {[c.get('name') for c in direct]}")
+        print(f"[market_competitor_agent] market_size: {mr.get('market_size', 'N/A')[:80]}")
     except Exception as exc:
         print(f"[market_competitor_agent] JSON parse failed: {exc} | raw[:300]: {raw[:300]}")
         combined = {}
