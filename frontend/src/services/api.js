@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+// Empty string = relative URLs → works behind Nginx proxy in production.
+// For local dev, set VITE_API_URL=http://127.0.0.1:8000 in frontend/.env.local
+const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 const api = axios.create({
   baseURL: API_BASE,
