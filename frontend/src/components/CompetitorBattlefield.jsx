@@ -121,6 +121,47 @@ export default function CompetitorBattlefield({ data }) {
                   ))}
                 </div>
               </div>
+
+              {/* Design Trends */}
+              {comp.design_trends && (
+                <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4 space-y-3">
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-300">
+                    Design Identity
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {comp.design_trends.color_palette && (
+                      <div className="space-y-0.5">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-white/30">Colors</div>
+                        <div className="text-xs text-white/70 leading-relaxed">{comp.design_trends.color_palette}</div>
+                      </div>
+                    )}
+                    {comp.design_trends.typography_style && (
+                      <div className="space-y-0.5">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-white/30">Typography</div>
+                        <div className="text-xs text-white/70 leading-relaxed">{comp.design_trends.typography_style}</div>
+                      </div>
+                    )}
+                    {comp.design_trends.logo_style && (
+                      <div className="space-y-0.5">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-white/30">Logo Style</div>
+                        <div className="text-xs text-white/70 leading-relaxed">{comp.design_trends.logo_style}</div>
+                      </div>
+                    )}
+                    {comp.design_trends.visual_language && (
+                      <div className="space-y-0.5">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-white/30">Visual Language</div>
+                        <div className="text-xs text-white/70 leading-relaxed">{comp.design_trends.visual_language}</div>
+                      </div>
+                    )}
+                  </div>
+                  {comp.design_trends.design_differentiation && (
+                    <div className="pt-2 border-t border-violet-500/10">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-white/30 mb-1">What makes it stand out / feel dated</div>
+                      <div className="text-xs text-white/60 leading-relaxed italic">{comp.design_trends.design_differentiation}</div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-8 text-center text-white/30">
@@ -160,6 +201,50 @@ export default function CompetitorBattlefield({ data }) {
                 <span className="text-blue-400 mr-2">⚡</span>{adv}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Industry Design Trends */}
+      {data.industry_design_trends && (
+        <div className="rounded-2xl border border-pink-500/20 bg-gradient-to-br from-pink-500/5 to-violet-500/5 p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🎨</span>
+            <div>
+              <div className="text-sm font-black text-white uppercase tracking-tight">Industry Design Trends</div>
+              <div className="text-[11px] text-white/40 mt-0.5">What the whole industry looks like — and where the visual white space is</div>
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-4">
+            {data.industry_design_trends.dominant_styles?.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-pink-300">Dominant Styles</div>
+                {data.industry_design_trends.dominant_styles.map((s, i) => (
+                  <div key={i} className="flex gap-2 text-xs text-white/70">
+                    <span className="text-pink-400 flex-shrink-0">▸</span>
+                    <span>{s}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {data.industry_design_trends.color_trends && (
+              <div className="space-y-1.5">
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-pink-300">Color Trends</div>
+                <p className="text-xs text-white/70 leading-relaxed">{data.industry_design_trends.color_trends}</p>
+              </div>
+            )}
+            {data.industry_design_trends.typography_trends && (
+              <div className="space-y-1.5">
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-pink-300">Typography Trends</div>
+                <p className="text-xs text-white/70 leading-relaxed">{data.industry_design_trends.typography_trends}</p>
+              </div>
+            )}
+            {data.industry_design_trends.design_white_space && (
+              <div className="rounded-xl border border-cyan-500/25 bg-cyan-500/5 p-3 space-y-1.5">
+                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300">Visual White Space ← Your Opportunity</div>
+                <p className="text-xs text-white/80 leading-relaxed">{data.industry_design_trends.design_white_space}</p>
+              </div>
+            )}
           </div>
         </div>
       )}

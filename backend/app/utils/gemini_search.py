@@ -19,12 +19,36 @@ def _get_client() -> genai.Client:
 
 
 def _extract_json(text: str) -> str:
-    """Strip markdown code fences and return raw JSON string."""
+    """
+    Extract the first valid top-level JSON object from Gemini's response.
+    Handles: markdown fences, leading/trailing prose, search grounding citations.
+    """
     text = text.strip()
-    match = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", text)
-    if match:
-        return match.group(1).strip()
-    return text
+
+    # 1. Explicit markdown fence (```json ... ``` or ``` ... ```)
+    fence = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", text)
+    if fence:
+        candidate = fence.group(1).strip()
+        try:
+            import json; json.loads(candidate)
+            return candidate
+        except Exception:
+            pass
+
+    # 2. Find the outermost { ... } by tracking brace depth
+    start = text.find("{")
+    if start == -1:
+        return "{}"
+    depth = 0
+    for i, ch in enumerate(text[start:], start):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+
+    return "{}"
 
 
 async def call_gemini_with_search(
@@ -53,7 +77,14 @@ async def call_gemini_with_search(
             ),
         )
         raw = response.text or "{}"
-        return _extract_json(raw)
+        extracted = _extract_json(raw)
+        # Validate — if extraction failed, log first 500 chars of raw response
+        try:
+            import json as _json; _json.loads(extracted)
+        except Exception:
+            print(f"[Gemini] JSON parse failed. Raw response (first 500 chars):\n{raw[:500]}")
+            return "{}"
+        return extracted
     except Exception as exc:
         print(f"[Gemini] Warning: {type(exc).__name__}: {str(exc)[:220]}")
         return "{}"

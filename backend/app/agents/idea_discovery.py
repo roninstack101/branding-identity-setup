@@ -1,59 +1,119 @@
 """
 Agent 1 – Idea Discovery Agent
-Refines and expands the raw user idea into a structured concept.
+Extracts and structures all key details from the user's raw idea prompt.
+Output feeds directly into market_competitor_agent, strategy_naming_agent, and visual_identity_agent.
 """
 import json
+import re
 from app.utils.llm import call_llm
 from app.schemas.brand_schema import AgentResult
 
 
-SYSTEM_PROMPT = """You are a Senior Market Intelligence Consultant. Your goal is to validate the business idea against real-world 2024-2025 market trends and identify the "Total Addressable Market" (TAM).
+SYSTEM_PROMPT = """You are an expert Business Analyst and Brand Strategist. Your job is to deeply parse a raw business idea — no matter how short or long — and extract every meaningful detail into a structured brief that other AI agents will use downstream.
 
-RESEARCH FRAMEWORK:
-1. PESTEL Analysis: Briefly consider Political, Economic, Social, Technological, Environmental, and Legal factors.
-2. Market Maturity: Is this a "Red Ocean" (saturated) or "Blue Ocean" (new)?
-3. Trend Velocity: Are the core technologies or behaviors behind this idea rising or declining?
+EXTRACTION FRAMEWORK:
+1. READ BETWEEN THE LINES: If the user says "Uber for dogs", extract the industry (pet services), model (marketplace/on-demand), audience (pet owners), problem (finding reliable dog care), etc.
+2. INFER WHAT'S MISSING: If the user doesn't mention a revenue model, infer the most likely one. If they don't name the audience, derive it from the problem.
+3. BE SPECIFIC: Never use vague placeholders like "general audience" or "various industries". Always commit to a specific, defensible answer.
+4. PRESERVE UNIQUE DETAILS: If the user mentions a location, technology, niche, or constraint — capture it exactly.
 
 Your output must be a JSON object with EXACTLY these keys:
+
 {
-  "market_size": "Estimated TAM/SAM/SOM or general market scale (e.g., $10B Global Market)",
-  "current_trends": ["Macro trend 1", "Industry-specific trend 2", "Consumer behavior shift 3"],
-  "target_demographics": "Detailed breakdown of the most profitable user segment",
-  "market_gaps": ["Unmet need 1", "Underserved niche 2"],
-  "growth_drivers": ["Factor accelerating adoption 1", "Factor 2"],
-  "regulatory_landscape": "Potential legal or compliance hurdles",
-  "swot_analysis": {
-    "strengths": ["Internal advantage 1"],
-    "weaknesses": ["Internal limitation 1"],
-    "opportunities": ["External growth factor 1"],
-    "threats": ["External risk factor 1"]
-  }
+  "refined_idea": "A 2-3 sentence restatement of the idea in professional, clear language. Captures the what, who, and why.",
+  "industry_category": "The specific industry vertical (e.g., 'B2B SaaS / HR Tech', 'D2C Health & Wellness', 'Marketplace / Gig Economy')",
+  "business_model": "The core business model (e.g., 'Subscription SaaS', 'Marketplace with commission', 'D2C e-commerce', 'Freemium mobile app')",
+  "problem_solved": "The single most painful problem this idea solves — be specific and human (e.g., 'Freelancers waste 6+ hours/week chasing invoices with no automated solution')",
+  "target_audience": {
+    "primary": "Specific primary persona (Age range, job title or life situation, key trait)",
+    "secondary": "Secondary audience who also benefits",
+    "geography": "Target geography — infer from context or default to 'Global / English-speaking markets'"
+  },
+  "value_proposition": "The core promise in one sentence: what the customer gets that they can't easily get elsewhere",
+  "key_differentiators": [
+    "Specific differentiator 1 — what makes this unlike existing solutions",
+    "Specific differentiator 2",
+    "Specific differentiator 3"
+  ],
+  "revenue_model": "How the business makes money (e.g., '$29/mo subscription + enterprise tier', '15% marketplace commission', 'Freemium with paid add-ons')",
+  "core_features": [
+    "Essential feature or capability 1",
+    "Essential feature or capability 2",
+    "Essential feature or capability 3",
+    "Essential feature or capability 4"
+  ],
+  "brand_tone_hints": "Words the user used (or implied) that hint at brand personality — e.g., 'smart, approachable, no-nonsense' or 'premium, aspirational, exclusive'",
+  "competitive_context": "What existing solutions does this compete with? Name 2-3 if obvious (e.g., 'Competes with Notion, Confluence, and Google Docs')",
+  "unique_insight": "The single sharpest observation about why this idea can win — the non-obvious angle that most people would miss"
 }
 
-Return ONLY valid JSON. Use the provided web search context to ground your findings in reality."""
+CRITICAL RULES:
+- Never return empty strings or null values. Always make an informed inference.
+- If the idea is very short (e.g., "an app for dog walkers"), expand it intelligently using your knowledge.
+- If the idea is long and detailed, distill it — don't just copy-paste.
+- Return ONLY valid JSON. No markdown, no explanation outside the JSON."""
 
 
 async def run(idea: str) -> AgentResult:
     """Execute the Idea Discovery Agent."""
-    user_prompt = f"Analyze and expand this business idea:\n\n{idea}"
+
+    user_prompt = (
+        f"USER'S RAW IDEA:\n\"\"\"\n{idea}\n\"\"\"\n\n"
+        f"Extract all key details from this idea into the required JSON structure. "
+        f"Be specific, concrete, and insightful. Infer what the user hasn't stated explicitly."
+    )
 
     raw = await call_llm(
         system_prompt=SYSTEM_PROMPT,
         user_prompt=user_prompt,
-        temperature=0.7,
+        temperature=0.5,
         response_format={"type": "json_object"},
     )
 
-    data = json.loads(raw)
+    # Strip possible markdown fences
+    clean = re.sub(r'^```(?:json)?\s*|\s*```$', '', raw.strip(), flags=re.MULTILINE)
+
+    try:
+        data = json.loads(clean)
+    except Exception:
+        # Fallback: return minimal structured data so the pipeline doesn't crash
+        data = {
+            "refined_idea": idea,
+            "industry_category": "General",
+            "business_model": "To be determined",
+            "problem_solved": idea,
+            "target_audience": {
+                "primary": "General audience",
+                "secondary": "Early adopters",
+                "geography": "Global",
+            },
+            "value_proposition": idea,
+            "key_differentiators": ["Innovative approach", "User-centric design", "Market timing"],
+            "revenue_model": "Subscription or freemium",
+            "core_features": ["Core functionality", "User dashboard", "Integrations", "Analytics"],
+            "brand_tone_hints": "modern, trustworthy",
+            "competitive_context": "Existing market solutions",
+            "unique_insight": "Early mover advantage in an emerging space",
+        }
+
+    # Ensure target_audience is always a dict (older runs may have a string)
+    if isinstance(data.get("target_audience"), str):
+        data["target_audience"] = {
+            "primary": data["target_audience"],
+            "secondary": "Early adopters",
+            "geography": "Global",
+        }
+
+    audience = data.get("target_audience", {})
+    primary_audience = audience.get("primary", "a broad audience") if isinstance(audience, dict) else str(audience)
 
     explanation = (
-        f"The idea '{idea[:60]}...' has been analyzed and refined. "
-        f"The concept targets {data.get('target_audience', 'a broad audience')} "
-        f"within the {data.get('industry_category', 'general')} industry. "
-        f"The core value proposition centers on {data.get('value_proposition', 'delivering unique value')}. "
-        f"Key differentiators include {', '.join(data.get('key_differentiators', [])[:3])}. "
-        f"The idea primarily solves: {data.get('problem_solved', 'an identified market gap')}. "
-        f"Potential revenue can be driven through {data.get('revenue_model', 'various channels')}."
+        f"Idea extracted: '{data.get('refined_idea', idea)[:80]}...' | "
+        f"Industry: {data.get('industry_category', 'General')} | "
+        f"Model: {data.get('business_model', 'TBD')} | "
+        f"Audience: {primary_audience} | "
+        f"Problem: {data.get('problem_solved', 'N/A')[:80]} | "
+        f"Differentiators: {', '.join(data.get('key_differentiators', [])[:2])}"
     )
 
     return AgentResult(data=data, explanation=explanation)

@@ -52,6 +52,7 @@ CRITICAL RULES:
 - For wordmark/lettermark/combination_mark logo types, the logo_prompt MUST include the brand name as text to render.
 - Each variant must have a UNIQUE visual direction — vary the color mood, typography style, and logo concept significantly.
 - Mix approaches: some bold/modern, some classic/elegant, some playful, some minimal, some luxurious.
+- If Competitor Design Profiles are provided, at least 3 variants MUST occupy the visual white space — design directions, color moods, or aesthetics that NO competitor currently uses. Call this out in the variant_name or logo_prompt.
 - Colors MUST reflect the brand_archetype and tone_of_voice, but interpreted differently in each variant.
 - Each color_palette array must have EXACTLY 5 hex values.
 - Fonts MUST be real Google Fonts (Inter, Playfair Display, Space Grotesk, DM Sans, Lora, Outfit, Raleway, Montserrat, Poppins, Merriweather, Roboto Slab, Nunito, Oswald, Crimson Text, Work Sans, Bebas Neue, Archivo).
@@ -421,7 +422,11 @@ async def run(
         "unique_selling_proposition": strategy_data.get("unique_selling_proposition", ""),
         "target_segments": strategy_data.get("target_segments", []),
         "industry": idea_discovery_data.get("industry_category", ""),
+        "business_model": idea_discovery_data.get("business_model", ""),
         "problem_solved": idea_discovery_data.get("problem_solved", ""),
+        "value_proposition": idea_discovery_data.get("value_proposition", ""),
+        "brand_tone_hints": idea_discovery_data.get("brand_tone_hints", ""),
+        "core_features": idea_discovery_data.get("core_features", []),
         "market_gaps": market_research_data.get("market_gaps", []),
         "competitor_weaknesses": [
             c.get("weaknesses", []) for c in competitor_data.get("direct_competitors", [])[:3]
@@ -429,15 +434,38 @@ async def run(
         ],
     }
 
-    design_trends = market_research_data.get("market_trends", [])
+    market_trends = market_research_data.get("market_trends", [])
+
+    # ── Competitor design analysis ─────────────────────────────────────
+    competitor_design_profiles = [
+        {
+            "name": c.get("name", ""),
+            "design_trends": c.get("design_trends", {}),
+        }
+        for c in competitor_data.get("direct_competitors", [])[:4]
+        if isinstance(c, dict) and c.get("design_trends")
+    ]
+    industry_design_trends = competitor_data.get("industry_design_trends", {})
 
     user_prompt = (
         f"Business Profile:\n{json.dumps(business_profile, indent=2)}\n\n"
-        f"Market Trends:\n{json.dumps(design_trends, indent=2)}\n\n"
-        f"Brand Name: {brand_name}\n"
+        f"Market Trends:\n{json.dumps(market_trends, indent=2)}\n\n"
+        + (
+            f"Competitor Design Profiles (use these to DIFFERENTIATE — avoid their visual clichés):\n"
+            f"{json.dumps(competitor_design_profiles, indent=2)}\n\n"
+            if competitor_design_profiles else ""
+        )
+        + (
+            f"Industry Design Trends (reference the white space to find unexplored visual directions):\n"
+            f"{json.dumps(industry_design_trends, indent=2)}\n\n"
+            if industry_design_trends else ""
+        )
+        + f"Brand Name: {brand_name}\n"
         f"Tagline: {tagline}\n"
         + (f"\nUser Feedback (address in ALL variants): {feedback}" if feedback else "")
-        + "\n\nGenerate 10 distinct brand identity variants."
+        + "\n\nGenerate 10 distinct brand identity variants. Use the competitor design profiles "
+        "to ensure at least 3 variants deliberately occupy the visual white space — directions "
+        "no existing competitor has claimed."
     )
 
     # ── Step 1: Generate 10 variants (1 Groq call) ─────────────────────

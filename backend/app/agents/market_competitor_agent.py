@@ -47,7 +47,14 @@ Your output must be a JSON object with EXACTLY these two top-level keys:
         "strengths": ["Unique advantage 1", "Unique advantage 2"],
         "weaknesses": ["Vulnerability 1", "Vulnerability 2"],
         "estimated_market_share": "e.g., Dominant Leader (40%) or Niche Player (5%)",
-        "website": "URL"
+        "website": "URL",
+        "design_trends": {
+          "color_palette": "Describe their dominant brand colors and emotional tone (e.g., 'bold reds and blacks — aggressive, high-energy')",
+          "typography_style": "Describe their font choices (e.g., 'geometric sans-serif for modernity, heavy weights for authority')",
+          "logo_style": "Describe their logo type and style (e.g., 'wordmark with custom letterforms, minimalist icon mark')",
+          "visual_language": "Overall design aesthetic (e.g., 'flat design, whitespace-heavy, photo-forward')",
+          "design_differentiation": "What makes their visual identity stand out or feel dated"
+        }
       }
     ],
     "indirect_competitors": [
@@ -59,7 +66,13 @@ Your output must be a JSON object with EXACTLY these two top-level keys:
     "competitive_advantages": ["Unfair advantage 1", "Moat opportunity 2", "Cost/Speed benefit 3"],
     "market_positioning_gaps": ["Underserved customer segment", "Missing feature set", "Pricing vacuum"],
     "recommended_positioning": "A 2-sentence tactical recommendation on how to pivot away from competitor strengths.",
-    "threat_level": "low | medium | high"
+    "threat_level": "low | medium | high",
+    "industry_design_trends": {
+      "dominant_styles": ["Most common visual style in this industry", "Secondary aesthetic trend"],
+      "color_trends": "Industry-wide color palette trends (e.g., 'earthy tones replacing neon in wellness brands')",
+      "typography_trends": "Font trends across the industry (e.g., 'variable fonts and humanist sans replacing rigid geometric types')",
+      "design_white_space": "Visual design directions that NO major competitor has claimed yet — opportunity to differentiate visually"
+    }
   }
 }
 
@@ -71,18 +84,34 @@ async def run(idea_data: dict) -> tuple[AgentResult, AgentResult]:
     Execute the combined Market Research + Competitor Analysis in a single Gemini call.
     Returns a tuple of (market_research_result, competitor_analysis_result).
     """
-    refined_idea = idea_data.get("refined_idea", "")
-    industry = idea_data.get("industry_category", "")
-    problem = idea_data.get("problem_solved", "")
+    refined_idea   = idea_data.get("refined_idea", "")
+    industry       = idea_data.get("industry_category", "")
+    problem        = idea_data.get("problem_solved", "")
+    business_model = idea_data.get("business_model", "")
+    differentiators = idea_data.get("key_differentiators", [])
+    competitors_hint = idea_data.get("competitive_context", "")
+    audience = idea_data.get("target_audience", {})
+    primary_audience = audience.get("primary", "") if isinstance(audience, dict) else str(audience)
+    geography = audience.get("geography", "Global") if isinstance(audience, dict) else "Global"
 
     user_prompt = (
         f"BRAND IDEA: {refined_idea}\n"
         f"INDUSTRY/CATEGORY: {industry}\n"
-        f"CORE PROBLEM SOLVED: {problem}\n\n"
+        f"BUSINESS MODEL: {business_model}\n"
+        f"CORE PROBLEM SOLVED: {problem}\n"
+        f"PRIMARY AUDIENCE: {primary_audience}\n"
+        f"TARGET GEOGRAPHY: {geography}\n"
+        f"KEY DIFFERENTIATORS: {', '.join(differentiators)}\n"
+        f"KNOWN COMPETITORS (from idea brief): {competitors_hint}\n\n"
         f"Search the web for the latest 2024/2025 data on this market and its competitors. "
         f"Identify market size with CAGR, key trends, top 3-5 direct competitors with their "
         f"strengths/weaknesses, indirect competitors, target demographics, market gaps, "
-        f"and what customers hate about existing solutions."
+        f"and what customers hate about existing solutions. "
+        f"For each direct competitor, also analyze their VISUAL DESIGN IDENTITY: brand colors and "
+        f"emotional tone, typography choices, logo style, overall visual language, and what makes "
+        f"their design stand out or feel dated. "
+        f"Finally, identify industry-wide design trends and any visual white space (design directions "
+        f"no competitor has claimed) that could be a differentiation opportunity."
     )
 
     raw = await call_gemini_with_search(
@@ -93,7 +122,11 @@ async def run(idea_data: dict) -> tuple[AgentResult, AgentResult]:
 
     try:
         combined = json.loads(raw)
-    except Exception:
+        print(f"[market_competitor_agent] Parsed OK — keys: {list(combined.keys())}")
+        ca = combined.get("competitor_analysis", {})
+        print(f"[market_competitor_agent] direct_competitors count: {len(ca.get('direct_competitors', []))}")
+    except Exception as exc:
+        print(f"[market_competitor_agent] JSON parse failed: {exc} | raw[:300]: {raw[:300]}")
         combined = {}
 
     # ── Split into market_research result ───────────────────────────────
