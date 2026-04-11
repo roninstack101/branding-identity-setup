@@ -80,6 +80,9 @@ async def _get_latest_output(
         )
         .order_by(AgentOutput.version.desc())
         .limit(1)
+        # populate_existing ensures we bypass the session identity-map cache
+        # and always read the freshest committed row from the DB.
+        .execution_options(populate_existing=True)
     )
     result = await db.execute(stmt)
     row = result.scalar_one_or_none()
@@ -227,9 +230,6 @@ async def run_step(
 
 async def build_state_from_db(db: AsyncSession, project: Project) -> WorkflowState:
     """Reconstruct the workflow state from saved DB outputs."""
-    # Expire session cache so we always read the latest committed rows,
-    # e.g. after user called select-name between steps.
-    db.expire_all()
     state = WorkflowState(project_id=project.id, idea=project.idea)
 
     for agent_name in AGENT_SEQUENCE:
