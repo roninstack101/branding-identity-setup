@@ -72,9 +72,6 @@ async def _get_latest_output(
     db: AsyncSession, project_id: UUID, agent_name: str
 ) -> dict | None:
     """Fetch the latest version of an agent output for a project."""
-    # expire_all forces SQLAlchemy to bypass the session identity-map cache
-    # so we always read the freshest committed row (important for select-name).
-    db.expire_all()
     stmt = (
         select(AgentOutput)
         .where(
@@ -230,6 +227,9 @@ async def run_step(
 
 async def build_state_from_db(db: AsyncSession, project: Project) -> WorkflowState:
     """Reconstruct the workflow state from saved DB outputs."""
+    # Expire session cache so we always read the latest committed rows,
+    # e.g. after user called select-name between steps.
+    db.expire_all()
     state = WorkflowState(project_id=project.id, idea=project.idea)
 
     for agent_name in AGENT_SEQUENCE:
