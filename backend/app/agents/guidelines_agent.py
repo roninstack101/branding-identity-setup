@@ -71,11 +71,30 @@ async def run(
     content_data: dict,
 ) -> AgentResult:
     """Execute the Brand Guidelines Agent."""
+
+    # Strip heavy SVG/logo data from design_data — it blows up the context window
+    design_summary = {
+        k: v for k, v in design_data.items()
+        if k not in ("variants", "logo_inspiration", "search_queries")
+    }
+    # Keep only first variant's palette + fonts as a lightweight reference
+    variants = design_data.get("variants", [])
+    if variants:
+        first = variants[0]
+        design_summary["primary_variant"] = {
+            "variant_name":   first.get("variant_name", ""),
+            "color_palette":  first.get("color_palette", []),
+            "color_roles":    first.get("color_roles", {}),
+            "heading_font":   first.get("heading_font", ""),
+            "body_font":      first.get("body_font", ""),
+            "logo_type":      first.get("logo_type", ""),
+        }
+
     user_prompt = (
         f"BRAND STRATEGY:\n{json.dumps(strategy_data, indent=2)}\n\n"
         f"BRAND NAME: {naming_data.get('brand_name', 'Brand')}\n"
         f"TAGLINE: {naming_data.get('tagline', '')}\n\n"
-        f"DESIGN DIRECTION:\n{json.dumps(design_data, indent=2)}\n\n"
+        f"DESIGN DIRECTION:\n{json.dumps(design_summary, indent=2)}\n\n"
         f"BRAND CONTENT:\n{json.dumps(content_data, indent=2)}\n\n"
         f"Create comprehensive brand guidelines that cover all aspects of this brand identity."
     )
@@ -85,9 +104,29 @@ async def run(
         user_prompt=user_prompt,
         temperature=0.6,
         response_format={"type": "json_object"},
+        max_tokens=3000,
     )
 
-    data = json.loads(raw)
+    try:
+        data = json.loads(raw)
+    except Exception:
+        data = {}
+
+    if not data:
+        data = {
+            "guidelines_version": "1.0",
+            "brand_overview": {
+                "mission": strategy_data.get("brand_mission", ""),
+                "vision":  strategy_data.get("brand_vision", ""),
+                "values":  strategy_data.get("brand_values", []),
+            },
+            "logo_usage": {"primary_usage": "", "minimum_size": "32px digital / 1 inch print", "clear_space": "Equal to logo height on all sides", "dont_rules": ["Don't stretch or distort", "Don't use unapproved colors"]},
+            "color_guidelines": {"primary_colors": [], "secondary_colors": [], "color_combinations": []},
+            "typography_guidelines": {"primary_typeface": design_summary.get("primary_variant", {}).get("heading_font", ""), "secondary_typeface": design_summary.get("primary_variant", {}).get("body_font", ""), "hierarchy": {}},
+            "voice_and_tone": {"personality": "", "dos": [], "donts": [], "example_phrases": []},
+            "imagery_guidelines": {"photography_style": "", "illustration_style": "", "icon_style": ""},
+            "digital_guidelines": {"website_style": "", "social_media": "", "email": ""},
+        }
 
     logo = data.get("logo_usage", {})
     explanation = (
