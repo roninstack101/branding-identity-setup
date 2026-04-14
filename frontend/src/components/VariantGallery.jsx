@@ -34,17 +34,6 @@ const GOOGLE_FONTS_CATALOG = {
 
 const ALL_FONTS = Object.values(GOOGLE_FONTS_CATALOG).flat();
 
-// ── Logo type badges ──────────────────────────────────────────────────────────
-const LOGO_TYPE_BADGE = {
-  wordmark:         { color: 'bg-blue-500/20 text-blue-300 border-blue-500/30',       label: 'Wordmark' },
-  lettermark:       { color: 'bg-violet-500/20 text-violet-300 border-violet-500/30', label: 'Lettermark' },
-  icon_mark:        { color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30', label: 'Icon Mark' },
-  combination_mark: { color: 'bg-amber-500/20 text-amber-300 border-amber-500/30',    label: 'Combination' },
-  emblem:           { color: 'bg-rose-500/20 text-rose-300 border-rose-500/30',       label: 'Emblem' },
-  abstract_mark:    { color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',       label: 'Abstract' },
-  mascot:           { color: 'bg-orange-500/20 text-orange-300 border-orange-500/30', label: 'Mascot' },
-};
-
 // ── Font loader ───────────────────────────────────────────────────────────────
 function loadFont(fontName) {
   if (!fontName) return;
@@ -66,40 +55,111 @@ function loadGoogleFonts(fonts) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function copyToClipboard(text) {
-  navigator.clipboard.writeText(text).catch(() => {});
+function useCopy(timeout = 2000) {
+  const [copied, setCopied] = useState(false);
+  const copy = (text) => {
+    navigator.clipboard.writeText(text).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), timeout);
+  };
+  return [copied, copy];
 }
 
-function downloadSVG(variant) {
-  let svg = variant.logo_svg;
-  if (!svg && variant.logo_url?.startsWith('data:image/svg+xml;base64,')) {
-    svg = atob(variant.logo_url.split(',')[1]);
-  }
-  if (!svg) return;
-  const blob = new Blob([svg], { type: 'image/svg+xml' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${(variant.variant_name || 'logo').replace(/\s+/g, '-').toLowerCase()}.svg`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+// ── Prompt Block ──────────────────────────────────────────────────────────────
+function PromptBlock({ label, icon, accentColor, borderColor, prompt }) {
+  const [copiedMj,  copyMj]  = useCopy();
+  const [copiedIdeo, copyIdeo] = useCopy();
 
-// ── Logo Preview ──────────────────────────────────────────────────────────────
-function LogoPreview({ variant, bgColor }) {
-  if (variant.logo_url) {
-    return (
-      <img
-        src={variant.logo_url}
-        alt={variant.variant_name}
-        className="w-full h-64 object-contain"
-        style={{ background: bgColor || variant.color_palette?.[4] || '#f8f8f8' }}
-      />
-    );
-  }
+  if (!prompt) return null;
+
+  const { concept, midjourney_prompt, ideogram_prompt, designer_brief } = prompt;
+
   return (
-    <div className="w-full h-64 flex items-center justify-center bg-white/5 border border-white/10">
-      <span className="text-white/20 text-sm">No SVG</span>
+    <div
+      className="rounded-2xl p-5 space-y-4"
+      style={{
+        background: `linear-gradient(135deg, ${accentColor}10, ${accentColor}06)`,
+        border: `1px solid ${borderColor}`,
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-2">
+        <span className="text-base">{icon}</span>
+        <span className="text-sm font-black tracking-wide" style={{ color: accentColor }}>{label}</span>
+      </div>
+
+      {/* Concept */}
+      {concept && (
+        <div className="space-y-1">
+          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/30">Concept</div>
+          <p className="text-xs text-white/60 leading-relaxed">{concept}</p>
+        </div>
+      )}
+
+      {/* Midjourney / DALL-E prompt */}
+      {midjourney_prompt && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/30">Midjourney / DALL-E</div>
+            <button
+              onClick={() => copyMj(midjourney_prompt)}
+              className="text-[10px] px-2.5 py-1 rounded-lg font-bold transition-all"
+              style={{
+                background: copiedMj ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${copiedMj ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.12)'}`,
+                color: copiedMj ? '#10b981' : 'rgba(255,255,255,0.5)',
+              }}
+            >
+              {copiedMj ? '✓ Copied' : 'Copy'}
+            </button>
+          </div>
+          <p className="text-xs text-white/50 leading-relaxed font-mono bg-white/[0.03] rounded-lg p-3 border border-white/[0.06]">
+            {midjourney_prompt}
+          </p>
+        </div>
+      )}
+
+      {/* Ideogram prompt */}
+      {ideogram_prompt && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/30">Ideogram AI</div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => copyIdeo(ideogram_prompt)}
+                className="text-[10px] px-2.5 py-1 rounded-lg font-bold transition-all"
+                style={{
+                  background: copiedIdeo ? 'rgba(16,185,129,0.15)' : `${accentColor}18`,
+                  border: `1px solid ${copiedIdeo ? 'rgba(16,185,129,0.4)' : borderColor}`,
+                  color: copiedIdeo ? '#10b981' : accentColor,
+                }}
+              >
+                {copiedIdeo ? '✓ Copied' : 'Copy'}
+              </button>
+              <a
+                href="https://ideogram.ai/t/explore"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] px-2.5 py-1 rounded-lg font-bold no-underline transition-all"
+                style={{ background: `${accentColor}18`, border: `1px solid ${borderColor}`, color: accentColor }}
+              >
+                Open ↗
+              </a>
+            </div>
+          </div>
+          <p className="text-xs text-white/50 leading-relaxed italic bg-white/[0.03] rounded-lg p-3 border border-white/[0.06]">
+            {ideogram_prompt}
+          </p>
+        </div>
+      )}
+
+      {/* Designer brief */}
+      {designer_brief && (
+        <div className="space-y-1">
+          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/25">Designer Brief</div>
+          <p className="text-xs text-white/40 leading-relaxed">{designer_brief}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -112,10 +172,7 @@ function FontPickerModal({ type, currentFont, onSelect, onClose }) {
     ? { 'Search Results': ALL_FONTS.filter((f) => f.toLowerCase().includes(search.toLowerCase())) }
     : GOOGLE_FONTS_CATALOG;
 
-  // Preload visible fonts
-  useEffect(() => {
-    ALL_FONTS.forEach(loadFont);
-  }, []);
+  useEffect(() => { ALL_FONTS.forEach(loadFont); }, []);
 
   return (
     <div
@@ -127,7 +184,6 @@ function FontPickerModal({ type, currentFont, onSelect, onClose }) {
         style={{ maxHeight: '80vh' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-white/10 flex-shrink-0">
           <div>
             <h3 className="text-white font-black text-lg">
@@ -141,7 +197,6 @@ function FontPickerModal({ type, currentFont, onSelect, onClose }) {
           >✕</button>
         </div>
 
-        {/* Search */}
         <div className="px-6 py-3 flex-shrink-0">
           <input
             type="text"
@@ -153,7 +208,6 @@ function FontPickerModal({ type, currentFont, onSelect, onClose }) {
           />
         </div>
 
-        {/* Font grid */}
         <div className="overflow-y-auto flex-1 px-6 pb-6 space-y-6">
           {Object.entries(filtered).map(([category, fonts]) =>
             fonts.length === 0 ? null : (
@@ -174,10 +228,7 @@ function FontPickerModal({ type, currentFont, onSelect, onClose }) {
                       >
                         <span
                           className="block text-sm mb-1 text-white truncate"
-                          style={{
-                            fontFamily: `'${font}', sans-serif`,
-                            fontWeight: type === 'heading' ? 700 : 400,
-                          }}
+                          style={{ fontFamily: `'${font}', sans-serif`, fontWeight: type === 'heading' ? 700 : 400 }}
                         >
                           {font}
                         </span>
@@ -199,24 +250,21 @@ function FontPickerModal({ type, currentFont, onSelect, onClose }) {
 
 // ── Variant Modal ─────────────────────────────────────────────────────────────
 function VariantModal({ variant, variantIndex, projectId, onClose, onUpdated }) {
-  const [editedColors,  setEditedColors]  = useState([...(variant.color_palette || [])]);
-  const [headingFont,   setHeadingFont]   = useState(variant.heading_font || '');
-  const [bodyFont,      setBodyFont]      = useState(variant.body_font    || '');
-  const [fontPicker,    setFontPicker]    = useState(null); // 'heading' | 'body' | null
-  const [regenerating,  setRegenerating]  = useState(false);
-  const [regenError,    setRegenError]    = useState('');
-  const [copiedPrompt,  setCopiedPrompt]  = useState(false);
-  const [localVariant,  setLocalVariant]  = useState(variant);
+  const [editedColors, setEditedColors] = useState([...(variant.color_palette || [])]);
+  const [headingFont,  setHeadingFont]  = useState(variant.heading_font || '');
+  const [bodyFont,     setBodyFont]     = useState(variant.body_font    || '');
+  const [fontPicker,   setFontPicker]   = useState(null);
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenError,   setRegenError]   = useState('');
+  const [localVariant, setLocalVariant] = useState(variant);
 
   useGoogleFont(headingFont);
   useGoogleFont(bodyFont);
 
-  const badge = LOGO_TYPE_BADGE[variant.logo_type] || LOGO_TYPE_BADGE.abstract_mark;
-
-  const colorsChanged = editedColors.some((c, i) => c !== (variant.color_palette || [])[i]);
+  const colorsChanged  = editedColors.some((c, i) => c !== (variant.color_palette || [])[i]);
   const headingChanged = headingFont !== (variant.heading_font || '');
   const bodyChanged    = bodyFont    !== (variant.body_font    || '');
-  const anyChanged = colorsChanged || headingChanged || bodyChanged;
+  const anyChanged     = colorsChanged || headingChanged || bodyChanged;
 
   const handleRegenerate = async () => {
     setRegenerating(true);
@@ -246,11 +294,9 @@ function VariantModal({ variant, variantIndex, projectId, onClose, onUpdated }) 
     setBodyFont(variant.body_font    || '');
   };
 
-  const handleCopyPrompt = () => {
-    copyToClipboard(localVariant.ideogram_prompt || '');
-    setCopiedPrompt(true);
-    setTimeout(() => setCopiedPrompt(false), 2000);
-  };
+  const primary   = editedColors[0] || '#6366f1';
+  const secondary = editedColors[1] || '#8b5cf6';
+  const bgColor   = editedColors[4] || '#f5f5f5';
 
   return (
     <>
@@ -269,36 +315,53 @@ function VariantModal({ variant, variantIndex, projectId, onClose, onUpdated }) 
           >✕</button>
 
           <div className="p-8 space-y-6">
-            {/* Header */}
+            {/* ── Header ── */}
             <div>
-              <h2 className="text-2xl font-black text-white">{localVariant.variant_name}</h2>
-              <span className={`inline-block mt-2 px-3 py-1 rounded-full text-[11px] font-bold border ${badge.color}`}>
-                {badge.label}
-              </span>
+              <h2
+                className="text-2xl font-black text-white"
+                style={{ fontFamily: `'${headingFont}', sans-serif` }}
+              >
+                {localVariant.variant_name}
+              </h2>
+              {localVariant.visual_strategy && (
+                <p className="text-sm text-white/45 leading-relaxed mt-2">{localVariant.visual_strategy}</p>
+              )}
             </div>
 
-            {/* Logo preview — light + dark */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl overflow-hidden border border-white/10">
-                {regenerating ? (
-                  <div className="w-full h-40 flex flex-col items-center justify-center gap-2 bg-white/5">
-                    <div className="w-7 h-7 border-2 border-white/20 border-t-white/70 rounded-full animate-spin" />
-                    <span className="text-white/30 text-xs">Regenerating…</span>
-                  </div>
-                ) : (
-                  <LogoPreview variant={localVariant} bgColor={editedColors[4] || '#f5f5f5'} />
-                )}
-              </div>
-              <div className="rounded-2xl overflow-hidden border border-white/10">
-                {regenerating ? (
-                  <div className="w-full h-40 flex items-center justify-center bg-slate-900">
-                    <div className="w-7 h-7 border-2 border-white/10 border-t-white/50 rounded-full animate-spin" />
-                  </div>
-                ) : (
-                  <LogoPreview variant={localVariant} bgColor="#0f172a" />
-                )}
+            {/* ── Brand Preview Strip ── */}
+            <div
+              className="rounded-2xl overflow-hidden border border-white/10"
+              style={{ background: bgColor }}
+            >
+              <div className="px-8 py-10 flex flex-col items-center justify-center gap-2 min-h-[120px]">
+                <div
+                  className="text-3xl font-black tracking-tight leading-none"
+                  style={{ fontFamily: `'${headingFont}', sans-serif`, color: primary }}
+                >
+                  {localVariant.variant_name}
+                </div>
+                <div
+                  className="text-xs tracking-widest uppercase"
+                  style={{ fontFamily: `'${bodyFont}', sans-serif`, color: secondary, opacity: 0.8 }}
+                >
+                  Brand Identity Preview
+                </div>
+                {/* Mini palette bar */}
+                <div className="flex gap-1 mt-3">
+                  {editedColors.map((hex, i) => (
+                    <div key={i} className="w-6 h-6 rounded-full border-2 border-white/20" style={{ backgroundColor: hex }} />
+                  ))}
+                </div>
               </div>
             </div>
+
+            {/* ── Logo Motivation ── */}
+            {localVariant.logo_motivation && (
+              <div className="rounded-xl p-4 bg-amber-500/5 border border-amber-500/20 space-y-1">
+                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-400/70">Logo Motivation</div>
+                <p className="text-xs text-white/55 leading-relaxed">{localVariant.logo_motivation}</p>
+              </div>
+            )}
 
             {/* ── Color Palette ── */}
             <div className="space-y-2">
@@ -343,9 +406,6 @@ function VariantModal({ variant, variantIndex, projectId, onClose, onUpdated }) 
                   <div className="text-white text-xl font-bold leading-tight" style={{ fontFamily: `'${headingFont}', sans-serif` }}>
                     Aa Bb Cc 123
                   </div>
-                  <div className="text-white/50 text-xs" style={{ fontFamily: `'${headingFont}', sans-serif` }}>
-                    The quick brown fox jumps.
-                  </div>
                 </div>
 
                 {/* Body font */}
@@ -368,9 +428,6 @@ function VariantModal({ variant, variantIndex, projectId, onClose, onUpdated }) 
                   <div className="text-white text-base leading-relaxed" style={{ fontFamily: `'${bodyFont}', sans-serif` }}>
                     Aa Bb Cc 123
                   </div>
-                  <div className="text-white/50 text-xs leading-relaxed" style={{ fontFamily: `'${bodyFont}', sans-serif` }}>
-                    The quick brown fox jumps.
-                  </div>
                 </div>
               </div>
               {localVariant.font_pairing_rationale && (
@@ -387,7 +444,7 @@ function VariantModal({ variant, variantIndex, projectId, onClose, onUpdated }) 
                       .filter(Boolean).join(' + ')} changed
                   </div>
                   <div className="text-xs text-white/40 mt-0.5">
-                    Regenerate to rebuild the SVG logo with your customisations
+                    Apply to update hex codes in all logo prompts
                   </div>
                 </div>
                 <button
@@ -402,8 +459,8 @@ function VariantModal({ variant, variantIndex, projectId, onClose, onUpdated }) 
                   className="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-black transition-all"
                 >
                   {regenerating
-                    ? <><span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" />Regenerating…</>
-                    : '✦ Regenerate'}
+                    ? <><span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" />Applying…</>
+                    : '✦ Apply Changes'}
                 </button>
               </div>
             )}
@@ -412,72 +469,27 @@ function VariantModal({ variant, variantIndex, projectId, onClose, onUpdated }) 
               <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl p-3">⚠ {regenError}</div>
             )}
 
-            {/* ── Ideogram prompt ── */}
-            {localVariant.ideogram_prompt && (
-              <div
-                className="rounded-xl p-4 space-y-3"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(168,85,247,0.08))',
-                  border: '1px solid rgba(99,102,241,0.25)',
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">✨</span>
-                    <span className="text-xs font-bold" style={{ color: '#818cf8' }}>Ideogram AI Prompt</span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium" style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>
-                      AI Image Gen
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleCopyPrompt}
-                      className="text-[10px] px-2.5 py-1 rounded-lg font-medium transition-all"
-                      style={{
-                        background: copiedPrompt ? 'rgba(16,185,129,0.15)' : 'rgba(99,102,241,0.15)',
-                        border: `1px solid ${copiedPrompt ? 'rgba(16,185,129,0.3)' : 'rgba(99,102,241,0.3)'}`,
-                        color: copiedPrompt ? '#10b981' : '#818cf8',
-                      }}
-                    >
-                      {copiedPrompt ? '✓ Copied!' : 'Copy Prompt'}
-                    </button>
-                    <a
-                      href="https://ideogram.ai/t/explore"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] px-2.5 py-1 rounded-lg font-medium no-underline"
-                      style={{ background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)', color: '#818cf8' }}
-                    >
-                      Open Ideogram ↗
-                    </a>
-                  </div>
-                </div>
-                <p className="text-xs text-white/50 leading-relaxed italic">{localVariant.ideogram_prompt}</p>
-              </div>
-            )}
+            {/* ── Wordmark Prompt ── */}
+            <PromptBlock
+              label="Wordmark Logo Prompt"
+              icon="✍️"
+              accentColor="#818cf8"
+              borderColor="rgba(99,102,241,0.25)"
+              prompt={localVariant.wordmark_prompt}
+            />
 
-            {/* ── Actions ── */}
-            <div className="flex gap-3 pt-2 border-t border-white/10">
-              {localVariant.logo_svg && (
-                <button
-                  onClick={() => downloadSVG(localVariant)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white text-slate-900 font-bold hover:bg-white/90 transition-all text-sm"
-                >
-                  ↓ Download SVG
-                </button>
-              )}
-              <button
-                onClick={handleCopyPrompt}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 font-bold hover:bg-indigo-600/30 transition-all text-sm"
-              >
-                Copy Ideogram Prompt
-              </button>
-            </div>
+            {/* ── Logomark Prompt ── */}
+            <PromptBlock
+              label="Logomark / Symbol Prompt"
+              icon="◈"
+              accentColor="#34d399"
+              borderColor="rgba(52,211,153,0.25)"
+              prompt={localVariant.logomark_prompt}
+            />
           </div>
         </div>
       </div>
 
-      {/* Font picker rendered outside the scrollable modal */}
       {fontPicker && (
         <FontPickerModal
           type={fontPicker}
@@ -499,20 +511,30 @@ function GalleryCard({ variant, onClick }) {
     loadGoogleFonts([variant.heading_font, variant.body_font]);
   }, [variant]);
 
-  const badge = LOGO_TYPE_BADGE[variant.logo_type] || LOGO_TYPE_BADGE.abstract_mark;
+  const primary = variant.color_palette?.[0] || '#6366f1';
+  const bg      = variant.color_palette?.[4] || '#f5f5f5';
 
   return (
     <button
       onClick={onClick}
       className="group text-left rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/20 transition-all overflow-hidden"
     >
+      {/* Brand preview area */}
       <div
-        className="w-full h-32 flex items-center justify-center border-b border-white/5"
-        style={{ background: variant.color_palette?.[4] || '#f5f5f5' }}
+        className="w-full h-32 flex flex-col items-center justify-center border-b border-white/5 gap-1 px-3"
+        style={{ background: bg }}
       >
-        {variant.logo_url
-          ? <img src={variant.logo_url} alt={variant.variant_name} className="w-full h-full object-contain p-3" />
-          : <span className="text-4xl opacity-30">🎨</span>}
+        <div
+          className="text-base font-black tracking-tight text-center leading-tight truncate w-full text-center"
+          style={{ fontFamily: `'${variant.heading_font}', sans-serif`, color: primary }}
+        >
+          {variant.variant_name}
+        </div>
+        <div className="flex gap-0.5 mt-1">
+          {(variant.color_palette || []).slice(0, 4).map((hex, i) => (
+            <div key={i} className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: hex }} />
+          ))}
+        </div>
       </div>
 
       <div className="p-3 space-y-2">
@@ -521,23 +543,45 @@ function GalleryCard({ variant, onClick }) {
           <span className="text-white/20 group-hover:text-white/50 transition-colors text-xs flex-shrink-0">↗</span>
         </div>
 
-        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${badge.color}`}>
-          {badge.label}
-        </span>
-
         {/* Palette bar */}
-        <div className="flex gap-0.5 rounded overflow-hidden h-4">
+        <div className="flex gap-0.5 rounded overflow-hidden h-3">
           {(variant.color_palette || []).map((hex, i) => (
             <div key={i} className="flex-1" style={{ backgroundColor: hex }} />
           ))}
         </div>
 
-        {/* Font in its own face */}
-        <div
-          className="text-[10px] text-white/50 truncate"
-          style={{ fontFamily: `'${variant.heading_font}', sans-serif` }}
-        >
-          {variant.heading_font}
+        {/* Fonts */}
+        <div className="flex gap-1.5 flex-wrap">
+          {variant.heading_font && (
+            <span
+              className="text-[9px] px-1.5 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-cyan-300/70 truncate max-w-[80px]"
+              style={{ fontFamily: `'${variant.heading_font}', sans-serif` }}
+            >
+              {variant.heading_font}
+            </span>
+          )}
+          {variant.body_font && (
+            <span
+              className="text-[9px] px-1.5 py-0.5 rounded-md bg-violet-500/10 border border-violet-500/20 text-violet-300/70 truncate max-w-[80px]"
+              style={{ fontFamily: `'${variant.body_font}', sans-serif` }}
+            >
+              {variant.body_font}
+            </span>
+          )}
+        </div>
+
+        {/* Prompt indicators */}
+        <div className="flex gap-1">
+          {variant.wordmark_prompt && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300/70">
+              ✍ Wordmark
+            </span>
+          )}
+          {variant.logomark_prompt && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300/70">
+              ◈ Logomark
+            </span>
+          )}
         </div>
       </div>
     </button>
@@ -548,7 +592,6 @@ function GalleryCard({ variant, onClick }) {
 export default function VariantGallery({ data, projectId, onRegenerate }) {
   const [localVariants, setLocalVariants] = useState([]);
   const [selected, setSelected]           = useState(null);
-  const [filter, setFilter]               = useState('all');
 
   useEffect(() => {
     const variants = Array.isArray(data?.variants) ? data.variants : [];
@@ -567,8 +610,8 @@ export default function VariantGallery({ data, projectId, onRegenerate }) {
 
   if (!data || localVariants.length === 0) return null;
 
-  const logoTypes = ['all', ...new Set(localVariants.map((v) => v.logo_type).filter(Boolean))];
-  const filtered  = filter === 'all' ? localVariants : localVariants.filter((v) => v.logo_type === filter);
+  const withWordmark  = localVariants.filter((v) => v.wordmark_prompt).length;
+  const withLogomark  = localVariants.filter((v) => v.logomark_prompt).length;
 
   return (
     <div className="space-y-6">
@@ -577,7 +620,7 @@ export default function VariantGallery({ data, projectId, onRegenerate }) {
         <div>
           <h2 className="text-2xl font-black text-white uppercase tracking-tight">Brand Variants</h2>
           <p className="text-white/40 text-sm mt-1">
-            {localVariants.length} variants · {localVariants.filter((v) => v.logo_svg).length} with SVG logos
+            {localVariants.length} variants · {withWordmark} wordmark prompts · {withLogomark} logomark prompts
           </p>
         </div>
         {onRegenerate && (
@@ -585,43 +628,31 @@ export default function VariantGallery({ data, projectId, onRegenerate }) {
             onClick={() => onRegenerate('visual_identity_agent', 'regenerate all brand variants with fresh creative directions')}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/70 hover:text-white transition-all text-sm font-semibold"
           >
-            🔄 Regenerate All
+            Regenerate All
           </button>
         )}
       </div>
 
-      {/* Logo type filter */}
-      <div className="flex gap-2 flex-wrap">
-        {logoTypes.map((type) => {
-          const badge = LOGO_TYPE_BADGE[type];
-          return (
-            <button
-              key={type}
-              onClick={() => setFilter(type)}
-              className={`px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all ${
-                filter === type
-                  ? (badge ? badge.color : 'bg-white/20 text-white border-white/30')
-                  : 'bg-white/5 border-white/10 text-white/50 hover:text-white/70'
-              }`}
-            >
-              {badge ? badge.label : 'All'}
-            </button>
-          );
-        })}
+      {/* Info callout */}
+      <div className="flex items-start gap-3 p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/15">
+        <span className="text-indigo-400 text-lg flex-shrink-0">✦</span>
+        <div className="text-xs text-white/45 leading-relaxed">
+          Each variant includes a <span className="text-indigo-300 font-bold">Wordmark prompt</span> (text-based logo) and a{' '}
+          <span className="text-emerald-300 font-bold">Logomark prompt</span> (symbol/icon) — ready for{' '}
+          <strong className="text-white/60">Ideogram AI</strong>, <strong className="text-white/60">Midjourney</strong>, or a human designer.
+          Click any variant to copy the prompts.
+        </div>
       </div>
 
       {/* Gallery grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-        {filtered.map((variant) => {
-          const realIndex = localVariants.indexOf(variant);
-          return (
-            <GalleryCard
-              key={realIndex}
-              variant={variant}
-              onClick={() => setSelected({ variant, index: realIndex })}
-            />
-          );
-        })}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4">
+        {localVariants.map((variant, realIndex) => (
+          <GalleryCard
+            key={realIndex}
+            variant={variant}
+            onClick={() => setSelected({ variant, index: realIndex })}
+          />
+        ))}
       </div>
 
       {/* Modal */}
