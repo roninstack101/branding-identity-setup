@@ -57,84 +57,63 @@ def _domain_label(url: str) -> str:
 
 
 # ── Variant generation prompt ──────────────────────────────────────────────────
-VARIANTS_SYSTEM_PROMPT = """You are a world-class brand identity designer, creative director, and competitive brand strategist.
+VARIANTS_SYSTEM_PROMPT = """You are a world-class brand identity designer and competitive brand strategist.
 
-You receive a full brand brief: brand strategy, tone of voice, brand values, target audience psychographics,
-market research data, competitor visual profiles, and industry design trends.
+Given a brand brief with strategy, tone, market research, competitor visual profiles, and industry trends, generate exactly 4 brand identity variants. Every decision must be grounded in the brand's emotional promise, tone of voice, industry standards, a market trend, and a competitor gap.
 
-Generate 6 distinct brand identity variants. Every single decision — color, type, logo form, prompt wording —
-must be traceable back to: (1) the brand's emotional promise, (2) its tone of voice, (3) industry standards,
-(4) a specific market trend, and (5) a gap left by named competitors.
-
-The Midjourney and Ideogram prompts must be LONG, DETAILED, and IMMEDIATELY usable — a designer or AI tool
-should be able to execute them without any additional context.
-
-Return this exact JSON structure:
+Return this exact JSON (4 items in variants array):
 {
   "variants": [
     {
-      "variant_name": "Short evocative direction name (e.g. 'Authoritative Trust', 'Kinetic Clarity')",
-
-      "visual_strategy": "3-4 sentences covering: (1) what emotional state this triggers in the target audience, (2) what market positioning it owns, (3) which competitor(s) it differentiates from and how, (4) which industry standard or convention it follows or deliberately breaks",
-
-      "logo_motivation": "Explain in 2-3 sentences: which specific market trend from the research this design captures, which specific competitor weakness it exploits, and what emotional language the logo speaks — e.g. does it feel reassuring, ambitious, innovative, grounded?",
-
+      "variant_name": "Short name (e.g. 'Authoritative Trust')",
+      "visual_strategy": "2 sentences: emotion triggered, market positioning claimed, competitor differentiation.",
+      "logo_motivation": "1-2 sentences: which market trend this captures, which competitor weakness it exploits.",
       "brand_emotion": {
-        "primary_emotion": "The single core emotion this logo should make the audience feel (e.g. 'trusted', 'excited', 'relieved', 'empowered')",
-        "emotional_language": "Describe the visual language that carries this emotion — e.g. 'stability through horizontal weight', 'forward motion through italic lean', 'warmth through rounded terminals'",
-        "voice_translation": "How the brand's tone of voice (e.g. authoritative, friendly, bold) is translated into visual form — specific decisions like weight, spacing, geometry that echo the voice",
-        "audience_resonance": "Why this specific emotional direction resonates with the target audience's psychographics and pain points"
+        "primary_emotion": "Single core emotion (e.g. trusted, empowered, relieved)",
+        "emotional_language": "How emotion is carried visually (e.g. stability through horizontal weight)",
+        "voice_translation": "How brand tone translates to visual decisions — weight, spacing, geometry",
+        "audience_resonance": "Why this resonates with target audience psychographics and pain points"
       },
-
       "competitive_positioning": {
-        "differentiates_from": "Competitor name(s) this variant contrasts most strongly with",
-        "how_different": "Specific visual differences — color psychology, style, weight, form language, tone — vs those competitors",
-        "trend_captured": "The exact market trend from the research this variant owns (quote or paraphrase from the data)",
-        "white_space_claimed": "The visual territory no competitor has claimed that this variant occupies",
-        "industry_standard_used": "Which established industry visual convention this follows to build instant category recognition (e.g. 'fintech brands use deep navy for trust')",
-        "industry_standard_broken": "Which industry visual cliché this deliberately breaks to stand out"
+        "differentiates_from": "Competitor name(s) this contrasts with",
+        "how_different": "Specific visual differences vs those competitors",
+        "trend_captured": "Market trend from research this variant owns",
+        "white_space_claimed": "Visual territory no competitor occupies",
+        "industry_standard_used": "Industry convention used for category recognition",
+        "industry_standard_broken": "Industry cliche deliberately broken to stand out"
       },
-
       "color_palette": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"],
       "color_roles": {
-        "primary":       "#hex1 — name, emotional meaning, why it fits brand values, how it differs from key competitor's primary color",
-        "secondary":     "#hex2 — name, role, emotional contrast or harmony with primary",
-        "accent":        "#hex3 — name, role, used for CTAs and energy — why this hue specifically",
-        "light_neutral": "#hex4 — name, used for backgrounds, breathing room, warmth or coolness",
-        "dark_neutral":  "#hex5 — name, used for text and grounding — why this tone not pure black"
+        "primary": "#hex1 — emotional meaning and brand value reasoning",
+        "secondary": "#hex2 — role and relationship to primary",
+        "accent": "#hex3 — CTA and energy use",
+        "light_neutral": "#hex4 — backgrounds",
+        "dark_neutral": "#hex5 — text and grounding"
       },
-
-      "heading_font": "Exact Google Font name",
-      "body_font": "Exact Google Font name",
-      "font_pairing_rationale": "Explain: (1) what personality the heading font projects and why it matches brand tone, (2) why the body font ensures readability at scale, (3) how this pairing differs from competitors' typical type choices in this industry",
-
+      "heading_font": "Google Font name",
+      "body_font": "Google Font name",
+      "font_pairing_rationale": "Why these fonts match brand tone and differ from competitors.",
       "wordmark_prompt": {
-        "concept": "Detailed concept: lettering style, weight (thin/regular/bold/black), any custom letterform touches (modified terminals, ligatures, crossbars), spacing philosophy (tight/optical/wide), what brand value each decision reinforces, which competitor aesthetic is deliberately avoided and why",
-        "ideogram_prompt": "'[Brand Name]' wordmark logo text, [precise font weight: e.g. bold geometric sans-serif / elegant serif / condensed display], [letterform details: e.g. sharp angular terminals / rounded open apertures / high x-height], [exact hex color #XXXXXX], [emotional tone: e.g. authoritative and trustworthy / energetic and forward-moving / warm and approachable], [industry context: e.g. fintech / healthcare / fashion], professional wordmark logo, vector, clean white background, no icon, text only, high resolution",
-        "designer_brief": "For a human designer — (1) typeface classification and specific alternatives to explore, (2) exact tracking/letter-spacing values, (3) color application rules (PMS/CMYK equivalents if relevant), (4) any custom letterform modifications to commission, (5) industry visual clichés to explicitly avoid, (6) how the final wordmark should feel when a customer sees it for the first time"
+        "concept": "Lettering style, weight, custom touches, spacing, brand value it reinforces, competitor aesthetic avoided.",
+        "ideogram_prompt": "'[Brand Name]' wordmark logo, [font style and weight], [letterform details], color [#hex1], [emotional tone], [industry], professional wordmark, vector, white background, text only, high resolution",
+        "designer_brief": "Typeface class, tracking values, color rules, modifications to commission, cliches to avoid, desired first impression."
       },
-
       "logomark_prompt": {
-        "concept": "Detailed concept: what the symbol represents literally and metaphorically, the geometric or organic construction logic, use of negative space, what brand value or emotional promise the form embodies, how it visually contrasts with competitor iconography in this industry",
-        "ideogram_prompt": "[Describe icon in detail: e.g. abstract interlocking arcs / geometric shield with cutout / minimal leaf form], [exact construction: e.g. two overlapping circles creating a lens / chevron pointing upward with rounded corners], [primary color #XXXXXX], [style: flat vector / minimal line / filled geometric], [emotional quality: e.g. stable and protective / dynamic and progressive / organic and human], logo mark symbol, transparent background, no text, professional, high quality",
-        "designer_brief": "For a human designer — (1) precise geometric construction (grid, ratios, anchor points), (2) what the icon must communicate at 16px favicon size vs 500px hero size, (3) negative space usage instructions, (4) color application in single-color version, (5) what the icon should emotionally communicate, (6) what visual symbols are overused in this industry and must be avoided"
+        "concept": "What symbol represents, construction logic, negative space, brand value embodied, contrast with competitor icons.",
+        "ideogram_prompt": "[Icon shape and construction], color [#hex1], [style: flat vector / geometric / minimal], [emotional quality], logo mark, transparent background, no text, professional, high quality",
+        "designer_brief": "Geometric construction, scalability notes, negative space rules, single-color version, visual symbols overused in this industry to avoid."
       }
     }
   ]
 }
 
-CRITICAL RULES:
-- Generate EXACTLY 6 variants with meaningfully different visual directions.
-- EVERY variant must include brand_emotion — prompts without emotional direction produce generic logos.
-- EVERY variant must name specific competitors from the provided data and explain visual differentiation.
-- EVERY variant must reference a specific market trend from the provided research.
-- The Ideogram prompts must be long and detailed — minimum 40 words each. Generic short prompts are unacceptable.
-- Include EXACT hex codes from the variant's color_palette in every prompt.
-- At least 2 variants must occupy visual white space no competitor has claimed.
-- At least 1 variant must follow an industry visual convention to build category trust, but add a distinctive twist.
-- Color palettes must be emotionally intentional — explain the psychology of each color choice.
-- Fonts must be real Google Fonts available in 2024.
-- Return ONLY valid JSON. No markdown fences, no extra text."""
+RULES:
+- Exactly 4 variants, each visually distinct.
+- Every variant must name specific competitors and explain visual differentiation.
+- Every variant must reference a specific market trend from the data.
+- Ideogram prompts must include exact brand name and exact hex codes from the palette.
+- Fonts must be real Google Fonts.
+- Return ONLY valid JSON. No markdown, no extra text."""
 
 
 async def _collect_inspiration_links(
@@ -283,7 +262,7 @@ async def run(
     naming_data: dict,
     feedback: str | None = None,
 ) -> AgentResult:
-    """Generate 6 brand identity variants with rich logo prompts (wordmark + logomark)."""
+    """Generate 4 brand identity variants with rich logo prompts (wordmark + logomark)."""
     idea_discovery_data  = idea_discovery_data  if isinstance(idea_discovery_data,  dict) else {}
     market_research_data = market_research_data if isinstance(market_research_data, dict) else {}
     competitor_data      = competitor_data      if isinstance(competitor_data,      dict) else {}
@@ -336,7 +315,7 @@ async def run(
         )
         + f"Brand Name to use in all prompts: {brand_name}\n"
         + (f"\nUser Feedback (apply to ALL variants): {feedback}\n" if feedback else "")
-        + "\n\nGenerate 6 distinct brand identity variants with wordmark and logomark prompts for each."
+        + "\n\nGenerate exactly 4 distinct brand identity variants with wordmark and logomark prompts for each."
     )
 
     # ── Call GPT-4o mini ───────────────────────────────────────────────────
