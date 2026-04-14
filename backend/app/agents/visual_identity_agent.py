@@ -5,6 +5,7 @@ for each color palette variant. No SVG generation — prompts are ready for
 Ideogram, Midjourney, DALL-E, or a human designer.
 """
 import json
+import os
 import re
 from urllib.parse import quote_plus, urlparse
 
@@ -339,19 +340,25 @@ async def run(
     )
 
     # ── Call GPT-4o mini ───────────────────────────────────────────────────
+    openai_key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not openai_key:
+        print("[visual_identity_agent] ERROR: OPENAI_API_KEY not set in .env — cannot generate variants")
+
     raw = await call_openai(
         system_prompt=VARIANTS_SYSTEM_PROMPT,
         user_prompt=user_prompt,
         temperature=0.8,
-        max_tokens=4096,
+        max_tokens=8000,
     )
 
     try:
         clean = re.sub(r'^```(?:json)?\s*|\s*```$', '', raw.strip(), flags=re.MULTILINE)
         parsed = json.loads(clean)
         variants = parsed.get("variants", [])
+        if not variants:
+            print(f"[visual_identity_agent] WARNING: parsed OK but variants list is empty. raw[:300]: {raw[:300]}")
     except Exception as exc:
-        print(f"[visual_identity_agent] JSON parse failed: {exc} | raw[:200]: {raw[:200]}")
+        print(f"[visual_identity_agent] JSON parse failed: {exc} | raw[:300]: {raw[:300]}")
         variants = []
 
     if not isinstance(variants, list):

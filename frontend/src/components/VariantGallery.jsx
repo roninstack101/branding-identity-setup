@@ -672,7 +672,29 @@ export default function VariantGallery({ data, projectId, onRegenerate }) {
     setSelected({ variant: updatedVariant, index });
   }, []);
 
-  if (!data || localVariants.length === 0) return null;
+  if (!data) return null;
+
+  if (localVariants.length === 0) {
+    return (
+      <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-8 text-center space-y-3">
+        <div className="text-3xl opacity-40">⚠️</div>
+        <div className="text-white/60 font-bold">Visual Identity data is empty</div>
+        <div className="text-white/35 text-sm leading-relaxed max-w-md mx-auto">
+          The visual identity agent ran but returned no variants. This usually means
+          <span className="text-amber-300/80"> OPENAI_API_KEY is missing</span> in the backend <code className="bg-white/10 px-1 rounded">.env</code> file.
+          <br />Check EC2 backend logs for <code className="bg-white/10 px-1 rounded">[visual_identity_agent]</code> errors.
+        </div>
+        {onRegenerate && (
+          <button
+            onClick={() => onRegenerate('visual_identity_agent', 'regenerate visual identity variants')}
+            className="mt-2 px-5 py-2 rounded-xl bg-white/5 border border-white/15 text-white/60 hover:text-white hover:bg-white/10 text-sm font-bold transition-all"
+          >
+            Retry
+          </button>
+        )}
+      </div>
+    );
+  }
 
   const withWordmark  = localVariants.filter((v) => v.wordmark_prompt).length;
   const withLogomark  = localVariants.filter((v) => v.logomark_prompt).length;
