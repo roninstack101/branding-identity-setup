@@ -59,61 +59,71 @@ def _domain_label(url: str) -> str:
 # ── Variant generation prompt ──────────────────────────────────────────────────
 VARIANTS_SYSTEM_PROMPT = """You are a world-class brand identity designer and competitive brand strategist.
 
-Given a brand brief with strategy, tone, market research, competitor visual profiles, and industry trends, generate exactly 4 brand identity variants. Every decision must be grounded in the brand's emotional promise, tone of voice, industry standards, a market trend, and a competitor gap.
+Given a brand brief with strategy, tone, market research, competitor visual profiles, and industry design trends, generate exactly 4 brand identity variants.
+
+IMPORTANT FOR LOGO PROMPTS:
+The Ideogram prompts must be RICH and SPECIFIC. They must reference:
+1. The actual design trends currently dominant in this industry (from the data provided)
+2. The visual styles trending for similar brands right now — e.g. if fintech brands are trending toward "clean geometric sans with teal gradients", reference that and either adopt it or deliberately subvert it
+3. The emotional language of the brand (authoritative, warm, bold, etc.)
+4. Exact construction details — icon shape, letterform style, negative space, stroke weight
+5. Exact hex colors from the palette
+These prompts must be detailed enough that pasting them directly into Ideogram AI produces a on-brand, professional logo.
 
 Return this exact JSON (4 items in variants array):
 {
   "variants": [
     {
-      "variant_name": "Short name (e.g. 'Authoritative Trust')",
-      "visual_strategy": "2 sentences: emotion triggered, market positioning claimed, competitor differentiation.",
-      "logo_motivation": "1-2 sentences: which market trend this captures, which competitor weakness it exploits.",
+      "variant_name": "Short evocative name (e.g. 'Authoritative Trust')",
+      "visual_strategy": "2 sentences: emotion triggered in audience, market positioning claimed, key competitor differentiation.",
+      "logo_motivation": "Which market trend this captures AND which competitor visual weakness it exploits. Name both specifically.",
       "brand_emotion": {
         "primary_emotion": "Single core emotion (e.g. trusted, empowered, relieved)",
-        "emotional_language": "How emotion is carried visually (e.g. stability through horizontal weight)",
-        "voice_translation": "How brand tone translates to visual decisions — weight, spacing, geometry",
-        "audience_resonance": "Why this resonates with target audience psychographics and pain points"
+        "emotional_language": "How that emotion is expressed visually — weight, spacing, form, curvature",
+        "voice_translation": "How the brand's tone of voice maps to specific visual decisions",
+        "audience_resonance": "Why this resonates with the target audience's psychology and pain points"
       },
       "competitive_positioning": {
-        "differentiates_from": "Competitor name(s) this contrasts with",
-        "how_different": "Specific visual differences vs those competitors",
-        "trend_captured": "Market trend from research this variant owns",
-        "white_space_claimed": "Visual territory no competitor occupies",
-        "industry_standard_used": "Industry convention used for category recognition",
-        "industry_standard_broken": "Industry cliche deliberately broken to stand out"
+        "differentiates_from": "Specific competitor name(s) this contrasts with",
+        "how_different": "Specific visual differences in color, style, weight, form vs those competitors",
+        "trend_captured": "Exact market/design trend from the provided data this variant owns",
+        "white_space_claimed": "Visual territory no competitor currently occupies",
+        "industry_standard_used": "Industry visual convention followed to build instant trust",
+        "industry_standard_broken": "Industry visual cliché deliberately broken to stand out"
       },
       "color_palette": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"],
       "color_roles": {
-        "primary": "#hex1 — emotional meaning and brand value reasoning",
-        "secondary": "#hex2 — role and relationship to primary",
-        "accent": "#hex3 — CTA and energy use",
-        "light_neutral": "#hex4 — backgrounds",
-        "dark_neutral": "#hex5 — text and grounding"
+        "primary": "#hex1 — emotional meaning, brand value reasoning, how it differs from competitors",
+        "secondary": "#hex2 — supporting role and tonal relationship to primary",
+        "accent": "#hex3 — CTA, energy, contrast use",
+        "light_neutral": "#hex4 — background and breathing room",
+        "dark_neutral": "#hex5 — body text and grounding"
       },
-      "heading_font": "Google Font name",
-      "body_font": "Google Font name",
-      "font_pairing_rationale": "Why these fonts match brand tone and differ from competitors.",
+      "heading_font": "Exact Google Font name",
+      "body_font": "Exact Google Font name",
+      "font_pairing_rationale": "Why these fonts match the brand tone and differ from typical competitors in this industry.",
       "wordmark_prompt": {
-        "concept": "Lettering style, weight, custom touches, spacing, brand value it reinforces, competitor aesthetic avoided.",
-        "ideogram_prompt": "'[Brand Name]' wordmark logo, [font style and weight], [letterform details], color [#hex1], [emotional tone], [industry], professional wordmark, vector, white background, text only, high resolution",
-        "designer_brief": "Typeface class, tracking values, color rules, modifications to commission, cliches to avoid, desired first impression."
+        "concept": "Lettering style, weight (e.g. bold geometric / light elegant / condensed display), custom touches, spacing, competitor aesthetic deliberately avoided.",
+        "ideogram_prompt": "DETAILED Ideogram prompt — include ALL of: exact brand name in quotes, font style and weight (e.g. bold condensed geometric sans-serif), letterform details (e.g. sharp angular terminals, high x-height, tight tracking), primary color hex [#XXXXXX] on white background, current design trend reference for this industry (e.g. 'in the style of modern fintech brands using clean geometric type'), emotional quality (e.g. authoritative and trustworthy), professional wordmark logo, vector, white background, text only, no icon, high resolution — write as a flowing descriptive sentence not a list",
+        "designer_brief": "Typeface classification, tracking/letter-spacing values, color application rules, custom letterform modifications, industry clichés to avoid, desired emotional first impression."
       },
       "logomark_prompt": {
-        "concept": "What symbol represents, construction logic, negative space, brand value embodied, contrast with competitor icons.",
-        "ideogram_prompt": "[Icon shape and construction], color [#hex1], [style: flat vector / geometric / minimal], [emotional quality], logo mark, transparent background, no text, professional, high quality",
-        "designer_brief": "Geometric construction, scalability notes, negative space rules, single-color version, visual symbols overused in this industry to avoid."
+        "concept": "What the symbol represents literally and metaphorically, geometric or organic construction, negative space usage, brand value embodied, contrast with competitor icons in this industry.",
+        "ideogram_prompt": "DETAILED Ideogram prompt — include ALL of: precise icon description (e.g. two overlapping circles forming a lens shape, or upward-pointing chevron with rounded corners), construction details (e.g. enclosed negative space, 2px stroke, balanced proportions), primary color hex [#XXXXXX], current design trend for this industry (e.g. 'trending minimal flat icon style used by leading brands in this space'), emotional quality (e.g. stable, forward-moving, warm), logo mark icon, transparent background, no text, scalable vector, professional, high quality — write as a flowing descriptive sentence",
+        "designer_brief": "Precise geometric grid construction, scalability at 16px and 500px, negative space rules, single-color version guidance, visual symbols overused in this industry to avoid."
       }
     }
   ]
 }
 
 RULES:
-- Exactly 4 variants, each visually distinct.
+- Generate EXACTLY 4 variants with distinct visual directions.
+- Every ideogram_prompt must be a rich, detailed paragraph — NOT a short list. Minimum 50 words per prompt.
+- Every ideogram_prompt must reference a current design trend for this industry (from the data provided).
+- Every ideogram_prompt must include the exact brand name (wordmark) or icon description (logomark) and exact hex codes.
 - Every variant must name specific competitors and explain visual differentiation.
-- Every variant must reference a specific market trend from the data.
-- Ideogram prompts must include exact brand name and exact hex codes from the palette.
 - Fonts must be real Google Fonts.
-- Return ONLY valid JSON. No markdown, no extra text."""
+- Return ONLY valid JSON. No markdown fences, no extra text."""
 
 
 async def _collect_inspiration_links(
@@ -302,20 +312,41 @@ async def run(
     ]
     industry_design_trends = competitor_data.get("industry_design_trends", {})
 
+    # Flatten industry design trends into readable text for the LLM
+    trend_lines = []
+    if industry_design_trends:
+        if industry_design_trends.get("dominant_styles"):
+            trend_lines.append("Dominant visual styles: " + ", ".join(industry_design_trends["dominant_styles"]))
+        if industry_design_trends.get("color_trends"):
+            trend_lines.append("Color trends: " + industry_design_trends["color_trends"])
+        if industry_design_trends.get("typography_trends"):
+            trend_lines.append("Typography trends: " + industry_design_trends["typography_trends"])
+        if industry_design_trends.get("design_white_space"):
+            trend_lines.append("Unclaimed visual space: " + industry_design_trends["design_white_space"])
+    market_trend_lines = market_research_data.get("market_trends", [])
+
     user_prompt = (
         f"BRAND BRIEF:\n{json.dumps(brand_brief, indent=2)}\n\n"
         + (
-            f"COMPETITOR DESIGN PROFILES (avoid their visual clichés — find the white space):\n"
+            f"COMPETITOR DESIGN PROFILES — reference these in your Ideogram prompts to show differentiation:\n"
             f"{json.dumps(competitor_design_profiles, indent=2)}\n\n"
             if competitor_design_profiles else ""
         )
         + (
-            f"INDUSTRY DESIGN TRENDS:\n{json.dumps(industry_design_trends, indent=2)}\n\n"
-            if industry_design_trends else ""
+            f"INDUSTRY DESIGN TRENDS — embed these directly into your Ideogram prompts:\n"
+            + "\n".join(f"• {t}" for t in trend_lines)
+            + "\n\n"
+            if trend_lines else ""
+        )
+        + (
+            f"MARKET TRENDS — reference these in logo_motivation and ideogram prompts:\n"
+            + "\n".join(f"• {t}" for t in market_trend_lines[:5])
+            + "\n\n"
+            if market_trend_lines else ""
         )
         + f"Brand Name to use in all prompts: {brand_name}\n"
         + (f"\nUser Feedback (apply to ALL variants): {feedback}\n" if feedback else "")
-        + "\n\nGenerate exactly 4 distinct brand identity variants with wordmark and logomark prompts for each."
+        + "\n\nGenerate exactly 4 distinct brand identity variants. Make every Ideogram prompt rich, detailed, and reference the industry trends above."
     )
 
     # ── Call GPT-4o mini ───────────────────────────────────────────────────
