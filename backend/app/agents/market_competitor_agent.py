@@ -1,135 +1,154 @@
 """
 Combined Market Research + Competitor Analysis Agent
-Single Gemini + Google Search call replacing two separate agents.
-Saves 1 search grounding request ($0.035) per brand analysis run.
+Uses Serper.dev for real Google search results, then Groq (Llama) to analyze
+them into structured JSON. Replaces Gemini Search Grounding.
 """
 import json
-from app.utils.gemini_search import call_gemini_with_search
+from app.utils.serper_search import serper_multi_search
+from app.utils.llm import call_llm
 from app.schemas.brand_schema import AgentResult
 
 
-SYSTEM_PROMPT = """You are a Senior Market Intelligence Consultant and Competitive Intelligence Analyst.
-Use Google Search to find real-time data. Your goal is to deliver BOTH a full market landscape AND a competitor battlefield map in a single, comprehensive research pass.
+ANALYSIS_SYSTEM_PROMPT = """You are a Senior Market Intelligence Consultant and Competitive Intelligence Analyst.
+You will be given real Google search results about a specific business/industry. Analyze them and return structured JSON.
 
-CRITICAL INDUSTRY LOCK RULE:
-- You MUST research ONLY the exact industry and geography stated in the prompt.
-- Direct competitors MUST be companies operating in the SAME business vertical (same product/service category) targeting the SAME customer type in the SAME geography.
-- NEVER include companies from unrelated industries. If the brand is a fintech lender for Indian electronics distributors, competitors must be Indian NBFCs, fintech lenders, or B2B credit providers — NOT consumer brands, retailers, or companies from other sectors.
-- If you are unsure whether a company is a real competitor, skip it.
-- Search queries must include the exact industry and geography to avoid drift.
-
-RESEARCH FRAMEWORK:
-1. MARKET ANALYSIS: Market size (TAM/SAM with CAGR), key trends (2024-2027), target demographics, market gaps, growth drivers — all specific to the stated industry and geography.
-2. COMPETITOR MAPPING: Direct competitors (same problem, same audience, same geography), indirect competitors (different solution, same pain point). SWOT from the outside, vulnerability mapping (what customers hate about the top players).
-3. TREND VELOCITY: Distinguish short-term fads from long-term structural shifts.
+CRITICAL RULES:
+- Only include companies that are in the EXACT same industry and geography as specified.
+- If the business is a fintech lender, competitors must be other lenders/NBFCs — NOT retailers or consumer brands.
+- Base your analysis ONLY on the search results provided. Do not hallucinate companies or data.
+- For design trends, describe what you know about the competitor's visual identity from search results.
 
 Your output must be a JSON object with EXACTLY these two top-level keys:
 
 {
   "market_research": {
-    "market_size": "Detailed estimate with CAGR and global vs. local outlook",
-    "market_trends": ["Emerging Tech Trend", "Consumer Behavior Shift", "Sustainability/Regulatory Trend", "Cultural Movement"],
+    "market_size": "Estimated market size with CAGR based on search results",
+    "market_trends": ["Trend 1 from search results", "Trend 2", "Trend 3", "Trend 4"],
     "competitor_landscape": [
       {
         "name": "Competitor Name",
         "strength": "What they do well",
-        "weakness": "Their vulnerability/gap",
-        "market_share_vibe": "Leader, Challenger, or Niche player"
+        "weakness": "Their gap",
+        "market_share_vibe": "Leader / Challenger / Niche"
       }
     ],
     "target_demographics": {
-      "primary_segment": "Detailed profile (Age, Income, Values)",
-      "psychographics": ["Interests", "Aspirations", "Pain points"],
-      "behavior_patterns": ["Buying habits", "Digital platforms they frequent"]
+      "primary_segment": "Detailed profile",
+      "psychographics": ["Interest 1", "Interest 2"],
+      "behavior_patterns": ["Pattern 1", "Pattern 2"]
     },
-    "market_gaps": ["Specific unmet need 1", "Service friction 2", "The White Space opportunity"],
-    "growth_drivers": ["Short-term catalyst", "Long-term scaling factor"],
-    "key_sources": ["Specific report, news article, or platform used for data"]
+    "market_gaps": ["Gap 1", "Gap 2", "Gap 3"],
+    "growth_drivers": ["Driver 1", "Driver 2"],
+    "key_sources": ["Source from search results 1", "Source 2"]
   },
   "competitor_analysis": {
     "direct_competitors": [
       {
         "name": "Competitor Name",
-        "description": "Strategic overview of their market offering",
-        "strengths": ["Unique advantage 1", "Unique advantage 2"],
-        "weaknesses": ["Vulnerability 1", "Vulnerability 2"],
-        "estimated_market_share": "e.g., Dominant Leader (40%) or Niche Player (5%)",
-        "website": "URL",
+        "description": "What they do and who they serve",
+        "strengths": ["Strength 1", "Strength 2"],
+        "weaknesses": ["Weakness 1", "Weakness 2"],
+        "estimated_market_share": "e.g., Market Leader or Niche Player",
+        "website": "URL if found in search results",
         "design_trends": {
-          "color_palette": "Describe their dominant brand colors and emotional tone (e.g., 'bold reds and blacks — aggressive, high-energy')",
-          "typography_style": "Describe their font choices (e.g., 'geometric sans-serif for modernity, heavy weights for authority')",
-          "logo_style": "Describe their logo type and style (e.g., 'wordmark with custom letterforms, minimalist icon mark')",
-          "visual_language": "Overall design aesthetic (e.g., 'flat design, whitespace-heavy, photo-forward')",
-          "design_differentiation": "What makes their visual identity stand out or feel dated"
+          "color_palette": "Describe their brand colors and tone",
+          "typography_style": "Describe their font choices",
+          "logo_style": "Describe their logo type",
+          "visual_language": "Overall design aesthetic",
+          "design_differentiation": "What makes their design stand out or feel dated"
         }
       }
     ],
     "indirect_competitors": [
       {
         "name": "Competitor Name",
-        "description": "How their alternative solution steals customer attention"
+        "description": "How they compete indirectly"
       }
     ],
-    "competitive_advantages": ["Unfair advantage 1", "Moat opportunity 2", "Cost/Speed benefit 3"],
-    "market_positioning_gaps": ["Underserved customer segment", "Missing feature set", "Pricing vacuum"],
-    "recommended_positioning": "A 2-sentence tactical recommendation on how to pivot away from competitor strengths.",
+    "competitive_advantages": ["Advantage 1", "Advantage 2", "Advantage 3"],
+    "market_positioning_gaps": ["Gap 1", "Gap 2"],
+    "recommended_positioning": "2-sentence positioning recommendation.",
     "threat_level": "low | medium | high",
     "industry_design_trends": {
-      "dominant_styles": ["Most common visual style in this industry", "Secondary aesthetic trend"],
-      "color_trends": "Industry-wide color palette trends (e.g., 'earthy tones replacing neon in wellness brands')",
-      "typography_trends": "Font trends across the industry (e.g., 'variable fonts and humanist sans replacing rigid geometric types')",
-      "design_white_space": "Visual design directions that NO major competitor has claimed yet — opportunity to differentiate visually"
+      "dominant_styles": ["Most common visual style", "Secondary style"],
+      "color_trends": "Industry-wide color trends",
+      "typography_trends": "Font trends in this industry",
+      "design_white_space": "Visual directions no competitor has claimed"
     }
   }
 }
 
-Return ONLY valid JSON. Search for the latest 2024/2025 data. Prioritize evidence-based insights."""
+Return ONLY valid JSON. No markdown, no extra text."""
 
 
 async def run(idea_data: dict) -> tuple[AgentResult, AgentResult]:
     """
-    Execute the combined Market Research + Competitor Analysis in a single Gemini call.
-    Returns a tuple of (market_research_result, competitor_analysis_result).
+    Execute combined Market Research + Competitor Analysis.
+    1. Search Google via Serper for real data
+    2. Analyze with Groq into structured JSON
+    Returns (market_research_result, competitor_analysis_result).
     """
-    refined_idea   = idea_data.get("refined_idea", "")
-    industry       = idea_data.get("industry_category", "")
-    problem        = idea_data.get("problem_solved", "")
-    business_model = idea_data.get("business_model", "")
-    differentiators = idea_data.get("key_differentiators", [])
-    competitors_hint = idea_data.get("competitive_context", "")
-    audience = idea_data.get("target_audience", {})
+    refined_idea    = idea_data.get("refined_idea", "")
+    industry        = idea_data.get("industry_category", "")
+    business_model  = idea_data.get("business_model", "")
+    problem         = idea_data.get("problem_solved", "")
+    audience        = idea_data.get("target_audience", {})
     primary_audience = audience.get("primary", "") if isinstance(audience, dict) else str(audience)
-    geography = audience.get("geography", "Global") if isinstance(audience, dict) else "Global"
+    geography       = audience.get("geography", "Global") if isinstance(audience, dict) else "Global"
+    competitors_hint = idea_data.get("competitive_context", "")
 
-    # Keep the prompt short and direct — Gemini search grounding drifts on long prompts
-    competitor_line = f"Start by searching for: {competitors_hint} competitors." if competitors_hint else ""
+    # Build targeted search queries
+    search_queries = [
+        f"{industry} {geography} market size 2024 2025",
+        f"{industry} {geography} top companies competitors",
+        f"{industry} {geography} market trends growth",
+    ]
+    if competitors_hint:
+        search_queries.append(f"{competitors_hint} {geography}")
+    else:
+        search_queries.append(f"{industry} {geography} leading companies")
+
+    print(f"[market_competitor_agent] Searching: {search_queries}")
+    search_results = await serper_multi_search(search_queries, num_per_query=8)
+    print(f"[market_competitor_agent] Got {len(search_results)} search results")
+
+    # Format search results for the LLM
+    if search_results:
+        results_text = "\n\n".join([
+            f"[{i+1}] {r['title']}\n{r['link']}\n{r['snippet']}"
+            for i, r in enumerate(search_results[:30])  # cap at 30 to stay in context
+        ])
+    else:
+        results_text = "No search results available. Use your knowledge to provide best-effort analysis."
 
     user_prompt = (
-        f"Research the following business and return market + competitor data as JSON.\n\n"
         f"INDUSTRY: {industry}\n"
         f"GEOGRAPHY: {geography}\n"
+        f"BUSINESS MODEL: {business_model}\n"
         f"BUSINESS: {refined_idea}\n"
-        f"AUDIENCE: {primary_audience}\n\n"
-        f"{competitor_line}\n"
-        f"Search specifically for '{industry} {geography} market size 2024' "
-        f"and '{industry} {geography} top companies competitors 2025'.\n\n"
-        f"Return ONLY companies and market data from the {industry} industry in {geography}. "
-        f"Do not include companies from any other industry."
+        f"AUDIENCE: {primary_audience}\n"
+        f"PROBLEM: {problem}\n\n"
+        f"GOOGLE SEARCH RESULTS:\n{results_text}\n\n"
+        f"Analyze the search results above and return market research + competitor analysis JSON. "
+        f"Only include competitors from {industry} in {geography}."
     )
 
-    raw = await call_gemini_with_search(
-        system_prompt=SYSTEM_PROMPT,
+    raw = await call_llm(
+        system_prompt=ANALYSIS_SYSTEM_PROMPT,
         user_prompt=user_prompt,
-        temperature=0.4,
+        temperature=0.3,
+        max_tokens=4096,
     )
 
     try:
-        combined = json.loads(raw)
+        # Strip markdown fences if present
+        import re
+        clean = re.sub(r'^```(?:json)?\s*|\s*```$', '', raw.strip(), flags=re.MULTILINE)
+        combined = json.loads(clean)
         ca = combined.get("competitor_analysis", {})
         mr = combined.get("market_research", {})
-        direct = ca.get("direct_competitors", [])
         print(f"[market_competitor_agent] Parsed OK | industry={industry} | geography={geography}")
-        print(f"[market_competitor_agent] direct_competitors: {[c.get('name') for c in direct]}")
+        print(f"[market_competitor_agent] direct_competitors: {[c.get('name') for c in ca.get('direct_competitors', [])]}")
         print(f"[market_competitor_agent] market_size: {mr.get('market_size', 'N/A')[:80]}")
     except Exception as exc:
         print(f"[market_competitor_agent] JSON parse failed: {exc} | raw[:300]: {raw[:300]}")
@@ -144,7 +163,7 @@ async def run(idea_data: dict) -> tuple[AgentResult, AgentResult]:
     mr_data.setdefault("market_trends", [])
     mr_data.setdefault("competitor_landscape", [])
     mr_data.setdefault("target_demographics", {
-        "primary_segment": "General audience",
+        "primary_segment": primary_audience or "General audience",
         "psychographics": [],
         "behavior_patterns": [],
     })
@@ -152,12 +171,12 @@ async def run(idea_data: dict) -> tuple[AgentResult, AgentResult]:
     mr_data.setdefault("growth_drivers", [])
     mr_data.setdefault("key_sources", [])
 
-    comps = [c.get("name") for c in mr_data.get("competitor_landscape", []) if isinstance(c, dict) and c.get("name")]
+    comps  = [c.get("name") for c in mr_data.get("competitor_landscape", []) if isinstance(c, dict) and c.get("name")]
     trends = mr_data.get("market_trends", [])
-    gaps = mr_data.get("market_gaps", [])
+    gaps   = mr_data.get("market_gaps", [])
     mr_explanation = (
-        f"Market analysis complete for '{industry}' via Gemini + Google Search. "
-        f"Identified {len(comps)} key competitors: {', '.join(comps[:3])}. "
+        f"Market analysis for '{industry}' via Serper + Groq. "
+        f"Identified {len(comps)} key players: {', '.join(comps[:3])}. "
         f"Market size: {mr_data.get('market_size', 'TBD')}. "
         f"Trends: {', '.join(trends[:2]) if trends else 'emerging demand shifts'}. "
         f"Key gap: {gaps[0] if gaps else 'general market whitespace'}."
@@ -168,13 +187,19 @@ async def run(idea_data: dict) -> tuple[AgentResult, AgentResult]:
     if not isinstance(ca_data, dict):
         ca_data = {}
 
+    ca_data.setdefault("direct_competitors", [])
+    ca_data.setdefault("indirect_competitors", [])
+    ca_data.setdefault("competitive_advantages", [])
+    ca_data.setdefault("market_positioning_gaps", [])
+    ca_data.setdefault("recommended_positioning", "")
+    ca_data.setdefault("threat_level", "medium")
+    ca_data.setdefault("industry_design_trends", {})
+
     direct = ca_data.get("direct_competitors", [])
     ca_explanation = (
-        f"Competitor analysis via Gemini + Google Search identified {len(direct)} direct competitor(s) "
-        f"in the {industry} space. "
-        f"Competitive advantages: {', '.join(ca_data.get('competitive_advantages', [])[:3])}. "
-        f"Threat level: {ca_data.get('threat_level', 'medium')}. "
-        f"Positioning: {ca_data.get('recommended_positioning', 'differentiate on innovation')}."
+        f"Competitor analysis identified {len(direct)} direct competitor(s) in {industry} / {geography}. "
+        f"Competitive advantages: {', '.join(ca_data.get('competitive_advantages', [])[:2])}. "
+        f"Threat level: {ca_data.get('threat_level', 'medium')}."
     )
 
     return (
