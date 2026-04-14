@@ -109,15 +109,13 @@ Return this exact JSON structure:
 
       "wordmark_prompt": {
         "concept": "Detailed concept: lettering style, weight (thin/regular/bold/black), any custom letterform touches (modified terminals, ligatures, crossbars), spacing philosophy (tight/optical/wide), what brand value each decision reinforces, which competitor aesthetic is deliberately avoided and why",
-        "midjourney_prompt": "'[Brand Name]' wordmark logo, [precise font weight: e.g. bold geometric sans-serif / elegant serif / condensed display], [letterform details: e.g. sharp angular terminals / rounded open apertures / high x-height], [exact hex color: e.g. primary color #XXXXXX on white], [emotional tone: e.g. authoritative and trustworthy / energetic and forward-moving / warm and approachable], [industry context: e.g. fintech / healthcare / fashion], clean minimal professional wordmark logo, vector, flat design, white background, no gradients, no shadows, high quality --ar 3:1 --style raw",
-        "ideogram_prompt": "'[Brand Name]' wordmark logo text, [font style], [weight], [color #XXXXXX], [emotional adjectives], [industry: e.g. financial services / wellness / technology], professional brand logo, vector, clean white background, no icon, text only, high resolution",
+        "ideogram_prompt": "'[Brand Name]' wordmark logo text, [precise font weight: e.g. bold geometric sans-serif / elegant serif / condensed display], [letterform details: e.g. sharp angular terminals / rounded open apertures / high x-height], [exact hex color #XXXXXX], [emotional tone: e.g. authoritative and trustworthy / energetic and forward-moving / warm and approachable], [industry context: e.g. fintech / healthcare / fashion], professional wordmark logo, vector, clean white background, no icon, text only, high resolution",
         "designer_brief": "For a human designer — (1) typeface classification and specific alternatives to explore, (2) exact tracking/letter-spacing values, (3) color application rules (PMS/CMYK equivalents if relevant), (4) any custom letterform modifications to commission, (5) industry visual clichés to explicitly avoid, (6) how the final wordmark should feel when a customer sees it for the first time"
       },
 
       "logomark_prompt": {
         "concept": "Detailed concept: what the symbol represents literally and metaphorically, the geometric or organic construction logic, use of negative space, what brand value or emotional promise the form embodies, how it visually contrasts with competitor iconography in this industry",
-        "midjourney_prompt": "[Describe icon: e.g. abstract interlocking arcs / geometric shield with cutout / minimal leaf form / bold letter initial] logo mark icon, [exact construction: e.g. two overlapping circles creating a lens / chevron pointing upward with rounded corners], [color hex codes from palette: primary #XXXXXX], [style: flat vector / minimal line / filled geometric], [emotional tone: e.g. stable and protective / dynamic and progressive / organic and human], professional brand icon, vector, white background, no text, scalable, high quality --ar 1:1 --style raw",
-        "ideogram_prompt": "[Icon description in detail], logo mark symbol, [primary color #XXXXXX], [style: minimal flat / geometric / abstract], [emotional quality: e.g. trustworthy / innovative / grounded], brand icon, transparent background, no text, professional, high quality",
+        "ideogram_prompt": "[Describe icon in detail: e.g. abstract interlocking arcs / geometric shield with cutout / minimal leaf form], [exact construction: e.g. two overlapping circles creating a lens / chevron pointing upward with rounded corners], [primary color #XXXXXX], [style: flat vector / minimal line / filled geometric], [emotional quality: e.g. stable and protective / dynamic and progressive / organic and human], logo mark symbol, transparent background, no text, professional, high quality",
         "designer_brief": "For a human designer — (1) precise geometric construction (grid, ratios, anchor points), (2) what the icon must communicate at 16px favicon size vs 500px hero size, (3) negative space usage instructions, (4) color application in single-color version, (5) what the icon should emotionally communicate, (6) what visual symbols are overused in this industry and must be avoided"
       }
     }
@@ -129,7 +127,7 @@ CRITICAL RULES:
 - EVERY variant must include brand_emotion — prompts without emotional direction produce generic logos.
 - EVERY variant must name specific competitors from the provided data and explain visual differentiation.
 - EVERY variant must reference a specific market trend from the provided research.
-- The Midjourney and Ideogram prompts must be long and detailed — minimum 40 words each. Generic short prompts are unacceptable.
+- The Ideogram prompts must be long and detailed — minimum 40 words each. Generic short prompts are unacceptable.
 - Include EXACT hex codes from the variant's color_palette in every prompt.
 - At least 2 variants must occupy visual white space no competitor has claimed.
 - At least 1 variant must follow an industry visual convention to build category trust, but add a distinctive twist.
@@ -231,9 +229,9 @@ async def regenerate_variant_svg(
 
     # Patch hex codes in all prompt fields
     prompt_fields = [
-        "wordmark_prompt.midjourney_prompt", "wordmark_prompt.ideogram_prompt",
+        "wordmark_prompt.ideogram_prompt",
         "wordmark_prompt.designer_brief", "wordmark_prompt.concept",
-        "logomark_prompt.midjourney_prompt", "logomark_prompt.ideogram_prompt",
+        "logomark_prompt.ideogram_prompt",
         "logomark_prompt.designer_brief", "logomark_prompt.concept",
         "ideogram_prompt",  # legacy field
     ]

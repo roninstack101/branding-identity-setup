@@ -67,12 +67,11 @@ function useCopy(timeout = 2000) {
 
 // ── Prompt Block ──────────────────────────────────────────────────────────────
 function PromptBlock({ label, icon, accentColor, borderColor, prompt }) {
-  const [copiedMj,  copyMj]  = useCopy();
   const [copiedIdeo, copyIdeo] = useCopy();
 
   if (!prompt) return null;
 
-  const { concept, midjourney_prompt, ideogram_prompt, designer_brief } = prompt;
+  const { concept, ideogram_prompt, designer_brief } = prompt;
 
   return (
     <div
@@ -93,29 +92,6 @@ function PromptBlock({ label, icon, accentColor, borderColor, prompt }) {
         <div className="space-y-1">
           <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/30">Concept</div>
           <p className="text-xs text-white/60 leading-relaxed">{concept}</p>
-        </div>
-      )}
-
-      {/* Midjourney / DALL-E prompt */}
-      {midjourney_prompt && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/30">Midjourney / DALL-E</div>
-            <button
-              onClick={() => copyMj(midjourney_prompt)}
-              className="text-[10px] px-2.5 py-1 rounded-lg font-bold transition-all"
-              style={{
-                background: copiedMj ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${copiedMj ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.12)'}`,
-                color: copiedMj ? '#10b981' : 'rgba(255,255,255,0.5)',
-              }}
-            >
-              {copiedMj ? '✓ Copied' : 'Copy'}
-            </button>
-          </div>
-          <p className="text-xs text-white/50 leading-relaxed font-mono bg-white/[0.03] rounded-lg p-3 border border-white/[0.06]">
-            {midjourney_prompt}
-          </p>
         </div>
       )}
 
