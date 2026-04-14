@@ -48,13 +48,6 @@ def _font_css_url(font_name: str) -> str:
     return f"https://fonts.googleapis.com/css2?family={family}:wght@400;500;600;700;800&display=swap"
 
 
-def _domain_label(url: str) -> str:
-    host = (urlparse(url).netloc or "").lower().replace("www.", "")
-    if "pinterest" in host: return "Pinterest"
-    if "behance"   in host: return "Behance"
-    if "dribbble"  in host: return "Dribbble"
-    return host.split(".")[0].title() if host else "Source"
-
 
 # ── Variant generation prompt ──────────────────────────────────────────────────
 VARIANTS_SYSTEM_PROMPT = """You are the lead brand identity designer at a world-class agency. A client has come to you for logo design. You have been given a complete 5-pillar brand brief (Core Identity, Competitive Landscape, Visual Landmarks, Target Audience, Constraints) plus live web research on competitor logos and current industry design trends.
@@ -204,83 +197,182 @@ async def _search_visual_references(
     }
 
 
+def _platform_from_url(url: str) -> str:
+    host = (urlparse(url).netloc or "").lower().replace("www.", "")
+    if "pinterest"         in host: return "Pinterest"
+    if "dribbble"          in host: return "Dribbble"
+    if "behance"           in host: return "Behance"
+    if "underconsideration" in host: return "Brand New"
+    if "logopond"          in host: return "Logopond"
+    if "logolounge"        in host: return "Logolounge"
+    if "fontsinuse"        in host: return "Fonts In Use"
+    if "thelogocreative"   in host: return "Logo Creative"
+    if "brandingidentitydesign" in host: return "Branding Journal"
+    return host.split(".")[0].title() if host else "Source"
+
+
+def _category_from_platform(platform: str) -> str:
+    if platform in ("Brand New", "Behance", "Branding Journal"):  return "Case Studies"
+    if platform in ("Logopond", "Logolounge", "Logo Creative"):    return "Logo Gallery"
+    if platform in ("Fonts In Use",):                              return "Typography"
+    if platform in ("Dribbble",):                                  return "Design Shots"
+    if platform in ("Pinterest",):                                 return "Moodboard"
+    return "Reference"
+
+
 async def _collect_inspiration_links(
     variants: list[dict],
-    brand_name: str,
+    brand_name: str,  # noqa: ARG001 – kept for call-site compatibility
     archetype: str,
     industry: str,
 ) -> list[dict]:
-    """Build search queries from variants and collect inspiration links."""
-    queries = []
-    seen: set[str] = set()
+    """Collect curated designer inspiration links from multiple sources, organised by category."""
+    import asyncio
 
-    def _add(label: str, query: str, reason: str):
-        if query not in seen:
-            seen.add(query)
-            queries.append({"label": label, "query": query, "reason": reason})
+    search_plan: list[dict] = []
+    seen_queries: set[str] = set()
 
+    def _plan(label: str, query: str, reason: str, category: str):
+        if query not in seen_queries:
+            seen_queries.add(query)
+            search_plan.append({"label": label, "query": query, "reason": reason, "category": category})
+
+    # ── Moodboard (Pinterest) ──────────────────────────────────────────────
+    _plan("Pinterest – Archetype Board",
+          f"site:pinterest.com {archetype} brand identity logo color palette",
+          "Archetype-aligned visual boards", "Moodboard")
+    _plan(f"Pinterest – {industry} logos",
+          f"site:pinterest.com {industry} logo design brand identity inspiration",
+          f"Logo mood boards for {industry}", "Moodboard")
+    for v in variants[:2]:
+        style = " ".join(v.get("variant_name", "").split()[:2])
+        if style:
+            _plan(f"Pinterest – {style}",
+                  f"site:pinterest.com {style} logo brand design {industry}",
+                  f"Mood board for '{style}' direction", "Moodboard")
+
+    # ── Design Shots (Dribbble) ────────────────────────────────────────────
+    _plan("Dribbble – Logo Exploration",
+          f"site:dribbble.com {industry} logo brand identity",
+          "Professional logo shots & explorations", "Design Shots")
+    _plan("Dribbble – Wordmark Design",
+          f"site:dribbble.com wordmark logo {industry} typography",
+          "Wordmark design explorations", "Design Shots")
+
+    # ── Case Studies (Behance + Brand New) ────────────────────────────────
+    _plan("Behance – Brand Identity",
+          f"site:behance.net {industry} brand identity logo case study",
+          "Full brand identity project case studies", "Case Studies")
+    _plan("Brand New – Identity Reviews",
+          f"site:underconsideration.com/brandnew {industry} brand identity logo",
+          "Professional brand identity critique & analysis", "Case Studies")
+
+    # ── Logo Gallery (Logopond + Logolounge) ──────────────────────────────
+    _plan("Logopond – Logo Gallery",
+          f"site:logopond.com {industry} logo",
+          "Curated logo gallery filtered by industry", "Logo Gallery")
+    _plan("Logolounge – Trends",
+          f"site:logolounge.com {industry} logo trend brand mark",
+          "Annual logo trend reports for this industry", "Logo Gallery")
+    _plan("Logo Creative – Inspiration",
+          f"site:thelogocreative.co.uk {industry} logo design inspiration",
+          "Curated logo inspiration by industry", "Logo Gallery")
+
+    # ── Typography (Fonts In Use) ──────────────────────────────────────────
+    for v in variants[:2]:
+        hfont = v.get("heading_font", "")
+        if hfont:
+            _plan(f"Fonts In Use – {hfont}",
+                  f"site:fontsinuse.com {hfont} brand logo identity",
+                  f"Real-world brand usage of {hfont}", "Typography")
+    _plan("Fonts In Use – Industry Type",
+          f"site:fontsinuse.com {industry} wordmark brand logo",
+          f"Typography used in {industry} brand identities", "Typography")
+
+    # ── Per-variant designer inspiration ──────────────────────────────────
     for v in variants[:4]:
         vname = v.get("variant_name", "")
         style = " ".join(vname.split()[:2])
-        _add(f"Pinterest – {vname}", f"site:pinterest.com {style} logo brand identity {industry}", f"Inspiration for '{vname}' direction")
+        emotion = v.get("brand_emotion", {}).get("primary_emotion", "")
+        if style:
+            _plan(f"Dribbble – {vname}",
+                  f"site:dribbble.com {style} {emotion} {industry} brand logo",
+                  f"Design shots for '{vname}' direction", "Design Shots")
+            _plan(f"Pinterest – {vname}",
+                  f"site:pinterest.com {style} {industry} brand identity logo inspiration",
+                  f"Moodboard for '{vname}'", "Moodboard")
 
-    _add("Pinterest – Brand Board",    f"site:pinterest.com {archetype} brand identity logo color palette", "Archetype-aligned brand boards")
-    _add("Dribbble – Logo Design",     f"site:dribbble.com {industry} logo brand identity design",          "Professional logo explorations")
-    _add("Behance – Brand Identity",   f"site:behance.net {brand_name} brand identity logo case study",    "Full identity case studies")
-
-    for v in variants[:3]:
-        hfont = v.get("heading_font", "")
-        if hfont:
-            _add(f"Typography – {hfont}", f"site:pinterest.com {hfont} typography logo brand design", f"Logos using {hfont}")
-
-    all_links: list[dict] = []
-    for item in queries[:8]:
-        results = await web_search(item["query"], num_results=5)
+    # ── Run all searches in parallel ──────────────────────────────────────
+    async def _fetch(plan_item: dict) -> list[dict]:
+        results = await web_search(plan_item["query"], num_results=4)
+        links = []
         for r in results:
-            link = r.get("link", "")
+            link  = r.get("link", "")
             title = r.get("title", "")
             if link and title:
-                all_links.append({
-                    "title": title, "brand_name": title, "link": link,
-                    "snippet": r.get("snippet", ""),
-                    "query": item["query"],
-                    "query_label": item["label"],
-                    "platform": _domain_label(link),
+                platform = _platform_from_url(link)
+                links.append({
+                    "title":        title,
+                    "brand_name":   title,
+                    "link":         link,
+                    "snippet":      r.get("snippet", ""),
+                    "query":        plan_item["query"],
+                    "query_label":  plan_item["label"],
+                    "platform":     platform,
+                    "category":     plan_item.get("category") or _category_from_platform(platform),
+                    "reason":       plan_item["reason"],
                 })
+        return links
+
+    tasks = [_fetch(p) for p in search_plan[:18]]
+    batches = await asyncio.gather(*tasks, return_exceptions=True)
 
     # Deduplicate
     seen_links: set[str] = set()
-    unique: list[dict] = []
-    for item in all_links:
-        if item["link"] not in seen_links:
-            seen_links.add(item["link"])
-            unique.append(item)
+    all_links: list[dict] = []
+    for batch in batches:
+        if isinstance(batch, Exception):
+            continue
+        for item in batch:
+            if item["link"] not in seen_links:
+                seen_links.add(item["link"])
+                all_links.append(item)
 
-    # Pinterest-prioritize
-    pinterest    = [i for i in unique if "pinterest" in i.get("platform", "").lower()]
-    non_pinterest = [i for i in unique if "pinterest" not in i.get("platform", "").lower()]
-    selected = (pinterest[:14] + non_pinterest)[:18]
+    # Sort: Case Studies > Logo Gallery > Design Shots > Typography > Moodboard
+    order = {"Case Studies": 0, "Logo Gallery": 1, "Design Shots": 2, "Typography": 3, "Moodboard": 4, "Reference": 5}
+    all_links.sort(key=lambda x: order.get(x.get("category", "Reference"), 5))
 
-    # Pad with direct Pinterest search URLs if under target
-    for item in queries:
-        if len(selected) >= 15:
-            break
-        url = f"https://www.pinterest.com/search/pins/?q={quote_plus(item['query'])}"
-        if not any(e["link"] == url for e in selected):
-            selected.append({
-                "title": f"Pinterest: {item['label']}", "brand_name": item["label"],
-                "link": url, "snippet": item["reason"],
-                "query": item["query"], "query_label": item["label"], "platform": "Pinterest",
+    # Pad with direct search fallback links if sparse
+    fallback_searches = [
+        ("Logopond",  f"https://logopond.com/?filter={quote_plus(industry)}",
+         "Logo Gallery", f"Browse {industry} logos on Logopond"),
+        ("Logolounge", f"https://www.logolounge.com/articles",
+         "Logo Gallery", "Annual logo trend reports"),
+        ("Brand New",  "https://www.underconsideration.com/brandnew/",
+         "Case Studies", "Professional brand identity reviews"),
+        ("Fonts In Use", f"https://fontsinuse.com/search#q={quote_plus(industry)}",
+         "Typography", f"Typography used in {industry} brands"),
+        ("Dribbble",   f"https://dribbble.com/search/{quote_plus(industry + ' logo')}",
+         "Design Shots", f"{industry} logo shots on Dribbble"),
+    ]
+    for plat, url, cat, reason in fallback_searches:
+        if not any(e["link"] == url for e in all_links):
+            all_links.append({
+                "title": f"{plat}: {industry} design", "brand_name": plat,
+                "link": url, "snippet": reason,
+                "query": "", "query_label": plat, "platform": plat,
+                "category": cat, "reason": reason,
             })
 
-    return selected[:18]
+    print(f"[visual_identity_agent] Inspiration links: {len(all_links)} across {len(set(x['category'] for x in all_links))} categories")
+    return all_links[:30]
 
 
 # ── regenerate_variant_svg kept for API compatibility (now just re-prompts) ───
 async def regenerate_variant_svg(
     variant: dict,
-    variant_index: int,
-    brand_name: str,
+    variant_index: int,   # noqa: ARG001 – kept for call-site compatibility
+    brand_name: str,      # noqa: ARG001 – kept for call-site compatibility
     new_color_palette: list[str],
     heading_font: str | None = None,
     body_font: str | None = None,
