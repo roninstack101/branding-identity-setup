@@ -363,6 +363,47 @@ function VariantModal({ variant, variantIndex, projectId, onClose, onUpdated }) 
               </div>
             )}
 
+            {/* ── Brand Emotion ── */}
+            {localVariant.brand_emotion && (
+              <div className="rounded-2xl overflow-hidden border border-pink-500/20">
+                <div className="px-4 py-2.5 bg-pink-500/10 border-b border-pink-500/15 flex items-center gap-2">
+                  <span className="text-pink-400 text-sm">◉</span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-pink-400/80">Brand Emotion &amp; Voice</span>
+                </div>
+                <div className="p-4 space-y-3">
+                  {localVariant.brand_emotion.primary_emotion && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-pink-400/60 w-28 flex-shrink-0">Core Emotion</span>
+                      <span
+                        className="text-sm font-black px-3 py-1 rounded-full"
+                        style={{ background: `${primary}22`, color: primary, border: `1px solid ${primary}44` }}
+                      >
+                        {localVariant.brand_emotion.primary_emotion}
+                      </span>
+                    </div>
+                  )}
+                  {localVariant.brand_emotion.emotional_language && (
+                    <div className="flex gap-3 items-start">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-pink-400/60 w-28 flex-shrink-0 pt-0.5">Visual Language</span>
+                      <span className="text-xs text-white/60 leading-relaxed">{localVariant.brand_emotion.emotional_language}</span>
+                    </div>
+                  )}
+                  {localVariant.brand_emotion.voice_translation && (
+                    <div className="flex gap-3 items-start">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-pink-400/60 w-28 flex-shrink-0 pt-0.5">Voice → Visual</span>
+                      <span className="text-xs text-white/60 leading-relaxed">{localVariant.brand_emotion.voice_translation}</span>
+                    </div>
+                  )}
+                  {localVariant.brand_emotion.audience_resonance && (
+                    <div className="flex gap-3 items-start">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-pink-400/60 w-28 flex-shrink-0 pt-0.5">Audience Fit</span>
+                      <span className="text-xs text-white/60 leading-relaxed">{localVariant.brand_emotion.audience_resonance}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* ── Competitive Positioning ── */}
             {localVariant.competitive_positioning && (
               <div className="rounded-2xl overflow-hidden border border-rose-500/20">
@@ -392,6 +433,18 @@ function VariantModal({ variant, variantIndex, projectId, onClose, onUpdated }) 
                     <div className="flex gap-3 items-start">
                       <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400/60 w-28 flex-shrink-0 pt-0.5">White Space</span>
                       <span className="text-xs text-indigo-300/70 leading-relaxed">{localVariant.competitive_positioning.white_space_claimed}</span>
+                    </div>
+                  )}
+                  {localVariant.competitive_positioning.industry_standard_used && (
+                    <div className="flex gap-3 items-start">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-cyan-400/60 w-28 flex-shrink-0 pt-0.5">Std. Followed</span>
+                      <span className="text-xs text-cyan-300/60 leading-relaxed">{localVariant.competitive_positioning.industry_standard_used}</span>
+                    </div>
+                  )}
+                  {localVariant.competitive_positioning.industry_standard_broken && (
+                    <div className="flex gap-3 items-start">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-orange-400/60 w-28 flex-shrink-0 pt-0.5">Cliché Broken</span>
+                      <span className="text-xs text-orange-300/60 leading-relaxed">{localVariant.competitive_positioning.industry_standard_broken}</span>
                     </div>
                   )}
                 </div>
