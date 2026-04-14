@@ -140,6 +140,53 @@ function PromptBlock({ label, icon, accentColor, borderColor, prompt }) {
   );
 }
 
+// ── Color Version Block ───────────────────────────────────────────────────────
+function ColorVersionBlock({ label, icon, accentColor, borderColor, prompt }) {
+  const [copied, copy] = useCopy();
+  if (!prompt) return null;
+  return (
+    <div
+      className="rounded-2xl p-4 space-y-3"
+      style={{
+        background: `linear-gradient(135deg, ${accentColor}0d, ${accentColor}06)`,
+        border: `1px solid ${borderColor}`,
+      }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-base" style={{ color: accentColor }}>{icon}</span>
+          <span className="text-sm font-black tracking-wide" style={{ color: accentColor }}>{label}</span>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => copy(prompt)}
+            className="text-[10px] px-2.5 py-1 rounded-lg font-bold transition-all"
+            style={{
+              background: copied ? 'rgba(16,185,129,0.15)' : `${accentColor}18`,
+              border: `1px solid ${copied ? 'rgba(16,185,129,0.4)' : borderColor}`,
+              color: copied ? '#10b981' : accentColor,
+            }}
+          >
+            {copied ? '✓ Copied' : 'Copy'}
+          </button>
+          <a
+            href="https://ideogram.ai/t/explore"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] px-2.5 py-1 rounded-lg font-bold no-underline transition-all"
+            style={{ background: `${accentColor}18`, border: `1px solid ${borderColor}`, color: accentColor }}
+          >
+            Open ↗
+          </a>
+        </div>
+      </div>
+      <p className="text-xs text-white/50 leading-relaxed italic bg-white/[0.03] rounded-lg p-3 border border-white/[0.06]">
+        {prompt}
+      </p>
+    </div>
+  );
+}
+
 // ── Font Picker Modal ─────────────────────────────────────────────────────────
 function FontPickerModal({ type, currentFont, onSelect, onClose }) {
   const [search, setSearch] = useState('');
@@ -292,15 +339,28 @@ function VariantModal({ variant, variantIndex, projectId, onClose, onUpdated }) 
 
           <div className="p-8 space-y-6">
             {/* ── Header ── */}
-            <div>
+            <div className="space-y-2">
+              {localVariant.visual_approach && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/12 border border-amber-500/25 text-amber-300 text-[11px] font-bold">
+                  <span className="opacity-70">⬡</span>
+                  {localVariant.visual_approach}
+                </div>
+              )}
               <h2
                 className="text-2xl font-black text-white"
                 style={{ fontFamily: `'${headingFont}', sans-serif` }}
               >
                 {localVariant.variant_name}
               </h2>
+              {localVariant.creative_rationale && (
+                <div className="rounded-xl px-4 py-3 bg-amber-500/6 border border-amber-500/18">
+                  <p className="text-sm text-amber-100/70 leading-relaxed italic">
+                    "{localVariant.creative_rationale}"
+                  </p>
+                </div>
+              )}
               {localVariant.visual_strategy && (
-                <p className="text-sm text-white/45 leading-relaxed mt-2">{localVariant.visual_strategy}</p>
+                <p className="text-sm text-white/40 leading-relaxed">{localVariant.visual_strategy}</p>
               )}
             </div>
 
@@ -550,6 +610,43 @@ function VariantModal({ variant, variantIndex, projectId, onClose, onUpdated }) 
               borderColor="rgba(52,211,153,0.25)"
               prompt={localVariant.logomark_prompt}
             />
+
+            {/* ── Color Versions ── */}
+            {localVariant.color_versions && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">3 Color Versions</span>
+                  <span className="text-[10px] text-white/20">— Ideogram prompts ready for each application</span>
+                </div>
+                {localVariant.color_versions.full_color && (
+                  <ColorVersionBlock
+                    label="Full Color"
+                    icon="◑"
+                    accentColor="#f59e0b"
+                    borderColor="rgba(245,158,11,0.25)"
+                    prompt={localVariant.color_versions.full_color}
+                  />
+                )}
+                {localVariant.color_versions.monochrome && (
+                  <ColorVersionBlock
+                    label="Monochrome"
+                    icon="◐"
+                    accentColor="#94a3b8"
+                    borderColor="rgba(148,163,184,0.25)"
+                    prompt={localVariant.color_versions.monochrome}
+                  />
+                )}
+                {localVariant.color_versions.dark_background && (
+                  <ColorVersionBlock
+                    label="Dark Background"
+                    icon="●"
+                    accentColor="#818cf8"
+                    borderColor="rgba(129,140,248,0.25)"
+                    prompt={localVariant.color_versions.dark_background}
+                  />
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -607,6 +704,20 @@ function GalleryCard({ variant, onClick }) {
           <span className="text-white/20 group-hover:text-white/50 transition-colors text-xs flex-shrink-0">↗</span>
         </div>
 
+        {/* Visual approach archetype badge */}
+        {variant.visual_approach && (
+          <div className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300/80 truncate w-fit max-w-full">
+            {variant.visual_approach}
+          </div>
+        )}
+
+        {/* Creative rationale */}
+        {variant.creative_rationale && (
+          <p className="text-[10px] text-white/45 leading-snug italic line-clamp-2">
+            {variant.creative_rationale}
+          </p>
+        )}
+
         {/* Palette bar */}
         <div className="flex gap-0.5 rounded overflow-hidden h-3">
           {(variant.color_palette || []).map((hex, i) => (
@@ -635,7 +746,7 @@ function GalleryCard({ variant, onClick }) {
         </div>
 
         {/* Prompt indicators */}
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
           {variant.wordmark_prompt && (
             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300/70">
               ✍ Wordmark
@@ -644,6 +755,11 @@ function GalleryCard({ variant, onClick }) {
           {variant.logomark_prompt && (
             <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300/70">
               ◈ Logomark
+            </span>
+          )}
+          {variant.color_versions && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-300/70">
+              ◑ 3 Colors
             </span>
           )}
         </div>
@@ -696,8 +812,9 @@ export default function VariantGallery({ data, projectId, onRegenerate }) {
     );
   }
 
-  const withWordmark  = localVariants.filter((v) => v.wordmark_prompt).length;
-  const withLogomark  = localVariants.filter((v) => v.logomark_prompt).length;
+  const withWordmark    = localVariants.filter((v) => v.wordmark_prompt).length;
+  const withLogomark    = localVariants.filter((v) => v.logomark_prompt).length;
+  const withColorVers   = localVariants.filter((v) => v.color_versions).length;
 
   return (
     <div className="space-y-6">
@@ -706,7 +823,7 @@ export default function VariantGallery({ data, projectId, onRegenerate }) {
         <div>
           <h2 className="text-2xl font-black text-white uppercase tracking-tight">Brand Variants</h2>
           <p className="text-white/40 text-sm mt-1">
-            {localVariants.length} variants · {withWordmark} wordmark prompts · {withLogomark} logomark prompts
+            {localVariants.length} variants · {withWordmark} wordmark · {withLogomark} logomark · {withColorVers} color versions
           </p>
         </div>
         {onRegenerate && (
@@ -723,10 +840,12 @@ export default function VariantGallery({ data, projectId, onRegenerate }) {
       <div className="flex items-start gap-3 p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/15">
         <span className="text-indigo-400 text-lg flex-shrink-0">✦</span>
         <div className="text-xs text-white/45 leading-relaxed">
-          Each variant includes a <span className="text-indigo-300 font-bold">Wordmark prompt</span> (text-based logo) and a{' '}
-          <span className="text-emerald-300 font-bold">Logomark prompt</span> (symbol/icon) — ready for{' '}
-          <strong className="text-white/60">Ideogram AI</strong>, <strong className="text-white/60">Midjourney</strong>, or a human designer.
-          Click any variant to copy the prompts.
+          Each variant is built on a named visual archetype, includes a{' '}
+          <span className="text-indigo-300 font-bold">Wordmark prompt</span>,{' '}
+          <span className="text-emerald-300 font-bold">Logomark prompt</span>, and{' '}
+          <span className="text-amber-300 font-bold">3 color versions</span> (full-color, monochrome, dark-mode) —
+          all ready for <strong className="text-white/60">Ideogram AI</strong> or a human designer.
+          Click any variant to explore and copy.
         </div>
       </div>
 
