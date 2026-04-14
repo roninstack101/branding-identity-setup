@@ -363,6 +363,41 @@ function VariantModal({ variant, variantIndex, projectId, onClose, onUpdated }) 
               </div>
             )}
 
+            {/* ── Competitive Positioning ── */}
+            {localVariant.competitive_positioning && (
+              <div className="rounded-2xl overflow-hidden border border-rose-500/20">
+                <div className="px-4 py-2.5 bg-rose-500/10 border-b border-rose-500/15">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-400/80">Competitive Positioning</span>
+                </div>
+                <div className="p-4 space-y-3">
+                  {localVariant.competitive_positioning.differentiates_from && (
+                    <div className="flex gap-3 items-start">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-rose-400/60 w-28 flex-shrink-0 pt-0.5">vs Competitors</span>
+                      <span className="text-xs text-white/60 leading-relaxed">{localVariant.competitive_positioning.differentiates_from}</span>
+                    </div>
+                  )}
+                  {localVariant.competitive_positioning.how_different && (
+                    <div className="flex gap-3 items-start">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-rose-400/60 w-28 flex-shrink-0 pt-0.5">How Different</span>
+                      <span className="text-xs text-white/60 leading-relaxed">{localVariant.competitive_positioning.how_different}</span>
+                    </div>
+                  )}
+                  {localVariant.competitive_positioning.trend_captured && (
+                    <div className="flex gap-3 items-start">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400/60 w-28 flex-shrink-0 pt-0.5">Trend Owned</span>
+                      <span className="text-xs text-emerald-300/70 leading-relaxed">{localVariant.competitive_positioning.trend_captured}</span>
+                    </div>
+                  )}
+                  {localVariant.competitive_positioning.white_space_claimed && (
+                    <div className="flex gap-3 items-start">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400/60 w-28 flex-shrink-0 pt-0.5">White Space</span>
+                      <span className="text-xs text-indigo-300/70 leading-relaxed">{localVariant.competitive_positioning.white_space_claimed}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* ── Color Palette ── */}
             <div className="space-y-2">
               <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Color Palette</div>

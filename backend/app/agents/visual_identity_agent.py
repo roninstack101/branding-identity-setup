@@ -56,28 +56,31 @@ def _domain_label(url: str) -> str:
 
 
 # ── Variant generation prompt ──────────────────────────────────────────────────
-VARIANTS_SYSTEM_PROMPT = """You are a world-class brand identity designer and creative director.
+VARIANTS_SYSTEM_PROMPT = """You are a world-class brand identity designer and competitive brand strategist.
 
-Given a complete brand brief (strategy, market research, competitor analysis, market trends),
-generate 6 distinct brand identity variants. For each variant you will:
-1. Design a color palette (5 hex colors) grounded in brand strategy and market positioning
-2. Write a professional WORDMARK logo prompt (text-based logo)
-3. Write a professional LOGOMARK logo prompt (symbol/icon-based logo)
-4. Select appropriate typography
-5. Explain the strategic motivation for this visual direction
+You are given a complete brand brief including: brand strategy, market research data, competitor visual profiles,
+and industry design trends. Your job is to generate 6 distinct brand identity variants where EVERY decision
+(color, typography, logo concept) is explicitly justified using the competitor data, market trends, and brand values provided.
 
-Each variant must be visually distinct — vary color mood, typography style, and logo concept significantly.
+The user will use these prompts to generate logos and COMPARE them against their competitors.
+So each prompt must clearly explain HOW it differentiates from specific competitors and WHICH trend it captures.
 
 Return this exact JSON structure:
 {
   "variants": [
     {
       "variant_name": "Short creative direction name (e.g. 'Authoritative Trust', 'Modern Agility')",
-      "visual_strategy": "2-3 sentences explaining WHY this visual direction — what market positioning it claims, what competitor gap it fills, what emotion it triggers in the target audience",
-      "logo_motivation": "What specific market trend, competitor weakness, or brand value inspired this logo direction",
+      "visual_strategy": "2-3 sentences: what market positioning this claims, which specific competitor(s) it differentiates from and how, what emotion it triggers in the target audience",
+      "logo_motivation": "Name the specific market trend this captures AND the specific competitor weakness it exploits. E.g. 'Captures the [trend] trend. Competitors like [X] use [style] — this variant deliberately avoids that and instead [does Y].'",
+      "competitive_positioning": {
+        "differentiates_from": "Competitor name(s) this variant contrasts most strongly with",
+        "how_different": "Specific visual differences — color, style, weight, tone — vs those competitors",
+        "trend_captured": "Which market trend from the research this variant is designed to own",
+        "white_space_claimed": "What visual territory no competitor has claimed that this variant occupies"
+      },
       "color_palette": ["#hex1", "#hex2", "#hex3", "#hex4", "#hex5"],
       "color_roles": {
-        "primary":       "#hex1 — role and strategic reasoning",
+        "primary":       "#hex1 — role, why this color fits brand values, and how it differs from competitor colors",
         "secondary":     "#hex2 — role and strategic reasoning",
         "accent":        "#hex3 — role and strategic reasoning",
         "light_neutral": "#hex4 — role and strategic reasoning",
@@ -85,18 +88,18 @@ Return this exact JSON structure:
       },
       "heading_font": "Google Font name",
       "body_font": "Google Font name",
-      "font_pairing_rationale": "Why these fonts work for this brand and variant direction",
+      "font_pairing_rationale": "Why these fonts fit the brand AND how they differ from competitors' typical typography in this industry",
       "wordmark_prompt": {
-        "concept": "Describe the wordmark concept — lettering style, custom touches, spacing, weight, any graphic element integrated into the type",
-        "midjourney_prompt": "Full Midjourney/DALL-E prompt: '[Brand Name]' wordmark logo, [describe style, weight, letterform details, color hex codes], [mood adjectives], professional brand logo, vector, white background, high quality",
-        "ideogram_prompt": "Full Ideogram prompt optimized for text rendering: '[Brand Name]' wordmark, [style], [colors as hex], [mood], logo design, vector, transparent background, professional, high quality",
-        "designer_brief": "Instructions for a human designer: typeface classification, letter-spacing rules, color application, any custom letterform modifications"
+        "concept": "Describe the wordmark concept — lettering style, custom touches, spacing, weight. Mention which competitor aesthetic this deliberately avoids and why.",
+        "midjourney_prompt": "Full Midjourney/DALL-E prompt ready to paste: '[Brand Name]' wordmark logo, [describe style, weight, letterform details, color hex codes from palette], [mood adjectives aligned to brand values], professional brand logo, vector, white background, high quality --ar 3:1",
+        "ideogram_prompt": "Full Ideogram prompt optimized for text rendering: '[Brand Name]' wordmark, [style], [exact hex colors], [mood], logo design, vector, transparent background, professional, high quality",
+        "designer_brief": "For a human designer: typeface classification, letter-spacing rules, color application, custom letterform modifications. Note which industry visual clichés to deliberately avoid."
       },
       "logomark_prompt": {
-        "concept": "Describe the symbol/icon concept — what it represents, geometric or organic, abstract or literal, what brand value it embodies",
-        "midjourney_prompt": "Full Midjourney/DALL-E prompt: abstract [shape] logo mark for [brand], [describe icon shape, negative space, geometric details], [color hex codes], minimal, professional, vector, white background",
-        "ideogram_prompt": "Full Ideogram prompt: [describe icon], logo mark, [colors as hex], [style], symbol, transparent background, professional, high quality",
-        "designer_brief": "Instructions for a human designer: geometry, proportions, what the icon communicates, scalability notes"
+        "concept": "Describe the symbol/icon concept — what it represents, the brand value it embodies, and how it visually contrasts with competitor symbols in this industry",
+        "midjourney_prompt": "Full Midjourney/DALL-E prompt ready to paste: [describe icon shape, negative space, geometric details] logo mark, [color hex codes from palette], [style adjectives], minimal, professional, vector, white background --ar 1:1",
+        "ideogram_prompt": "Full Ideogram prompt: [describe icon in detail], logo mark, [exact hex colors], [style], symbol, transparent background, professional, high quality",
+        "designer_brief": "For a human designer: geometry, proportions, scalability notes. Describe what the icon communicates about the brand and what visual clichés of this industry to avoid."
       }
     }
   ]
@@ -104,12 +107,13 @@ Return this exact JSON structure:
 
 CRITICAL RULES:
 - Generate EXACTLY 6 variants.
-- Each variant must have a DIFFERENT visual strategy — vary from authoritative/traditional to modern/minimal to bold/energetic etc.
-- Color palettes must be strategic, not random. Justify every color with brand logic.
-- Wordmark and logomark prompts must be SPECIFIC and ACTIONABLE — a designer or AI tool should be able to execute them immediately.
-- Use EXACT hex codes from color_palette in the prompts.
-- At least 2 variants must deliberately contrast with competitor design trends (occupy visual white space).
-- Fonts must be real Google Fonts.
+- EVERY variant must name specific competitors from the provided data and explain how it visually differs from them.
+- EVERY variant must reference a specific market trend from the provided research data.
+- Color palettes must be strategic — justify each color against brand values and competitor colors.
+- At least 2 variants must explicitly occupy visual white space that NO current competitor has claimed.
+- At least 1 variant must deliberately mirror a competitor's trust signals but with a fresher execution.
+- Wordmark and logomark prompts must be IMMEDIATELY usable in Ideogram or Midjourney — specific, detailed, with exact hex codes.
+- Fonts must be real Google Fonts available in 2024.
 - Return ONLY valid JSON. No markdown fences, no extra text."""
 
 
