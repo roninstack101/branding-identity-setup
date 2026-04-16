@@ -22,7 +22,7 @@ from urllib.parse import quote_plus, urlparse
 
 from app.schemas.brand_schema import AgentResult
 from app.utils.gemini_search import call_gemini_with_search
-from app.utils.llm import call_llm
+from app.utils.llm import call_llm, call_openai
 from app.utils.search import web_search
 
 
@@ -459,32 +459,152 @@ async def _collect_inspiration_links(industry: str, concepts: list[dict]) -> lis
     return all_links[:30]
 
 
-# ── SVG generation — deterministic, no LLM ────────────────────────────────────
-def _generate_concept_svgs(
+# ── GPT-4o symbol prompt ──────────────────────────────────────────────────────
+_SYMBOL_SYSTEM = """\
+You are a world-class SVG logo designer. Generate ONLY the inner SVG shape elements for a logo symbol mark.
+
+STRICT OUTPUT RULES:
+- Return ONLY SVG elements — NO full <svg> wrapper, NO <defs>, NO <style>, NO <text>
+- Allowed tags: rect, circle, ellipse, path, polygon, polyline, line, g
+- All coordinates must stay within x:60–340, y:30–265 (center: x=200, y=148)
+- No JavaScript, no external refs, no event handlers, no clip-path ids
+- Attribute values must be valid SVG strings
+- Create 4–10 shapes that clearly express the visual approach
+- The mark should be minimal, geometric, and professional
+
+Return nothing except the raw SVG element(s). No explanation, no markdown."""
+
+_SYMBOL_USER_TMPL = """\
+Brand: {brand} ({abbr})
+Tagline: "{tagline}"
+Visual approach: {approach}
+Concept name: {name}
+Design direction: {direction}
+Creative rationale: {rationale}
+Primary colour: {primary}
+Accent colour: {accent}
+
+Draw a {approach} logo symbol for {brand} using the design direction above.
+Express the brand's identity through minimal geometric shapes.
+Primary colour {primary} for the main shapes. Accent colour {accent} for highlights."""
+
+
+def _extract_svg_elements(raw: str) -> str:
+    """Strip any accidental <svg> wrapper or markdown fences, return inner elements only."""
+    if not raw:
+        return ""
+    # Strip markdown fences
+    raw = re.sub(r"```[a-z]*\n?", "", raw).strip()
+    # If there's a full <svg>…</svg>, extract inner content
+    inner = re.search(r"<svg[^>]*>([\s\S]*?)</svg>", raw, re.IGNORECASE)
+    if inner:
+        raw = inner.group(1).strip()
+    # Remove any <defs>, <style>, <text> blocks
+    raw = re.sub(r"<defs[\s\S]*?</defs>", "", raw, flags=re.IGNORECASE)
+    raw = re.sub(r"<style[\s\S]*?</style>", "", raw, flags=re.IGNORECASE)
+    raw = re.sub(r"<text[\s\S]*?</text>", "", raw, flags=re.IGNORECASE)
+    # Remove script tags and event handlers
+    raw = re.sub(r"<script[\s\S]*?</script>", "", raw, flags=re.IGNORECASE)
+    raw = re.sub(r'\s+on\w+="[^"]*"', "", raw)
+    # Keep only lines that look like SVG elements
+    lines = [l for l in raw.splitlines() if l.strip() and not l.strip().startswith("<!--")]
+    return "\n".join(lines).strip()
+
+
+def _wordmark(brand_name: str, abbreviation: str, concept_num: int, concept_name: str,
+              primary: str, accent: str) -> str:
+    bn = _xe(brand_name)
+    ab = _xe(abbreviation)
+    cn = _xe(concept_name).upper()
+    return (
+        f'<line x1="60" y1="283" x2="340" y2="283" stroke="#e5e7eb" stroke-width="1"/>'
+        f'<text x="200" y="316" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"'
+        f' font-size="26" font-weight="700" fill="{primary}">{bn}</text>'
+        f'<text x="200" y="346" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"'
+        f' font-size="11" font-weight="600" letter-spacing="5" fill="{accent}">{ab}</text>'
+        f'<text x="200" y="383" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"'
+        f' font-size="9" fill="#9ca3af">{concept_num}. {cn}</text>'
+    )
+
+
+def _wrap_svg(symbol: str, wm: str) -> str:
+    return (
+        '<svg viewBox="0 0 400 400" width="400" height="400" xmlns="http://www.w3.org/2000/svg">'
+        '<rect width="400" height="400" fill="white"/>'
+        f'{symbol}'
+        f'{wm}'
+        '</svg>'
+    )
+
+
+# ── SVG generation — GPT-4o symbol + deterministic wordmark ───────────────────
+async def _generate_concept_svgs(
     brand_name: str,
     abbreviation: str,
+    tagline: str,
     concepts: list[dict],
     primary_color: str,
     accent_color: str,
 ) -> list[dict]:
-    """Build one pixel-perfect SVG per concept using the deterministic template system."""
+    """
+    For each concept:
+      1. Ask GPT-4o to generate brand-specific symbol SVG elements.
+      2. Combine with deterministic wordmark section.
+      3. Fall back to pre-built geometric template if GPT-4o fails.
+    Runs sequentially — quality over speed.
+    """
     final: list[dict] = []
-    for concept in concepts:
+
+    for i, concept in enumerate(concepts):
         palette   = concept.get("palette", [])
         c_primary = palette[0] if palette else primary_color
         c_accent  = palette[1] if len(palette) > 1 else accent_color
-        svg = _build_deterministic_svg(
-            approach     = concept.get("approach", ""),
-            brand_name   = brand_name,
-            abbreviation = abbreviation,
-            concept_num  = concept.get("number", 0),
-            concept_name = concept.get("name", ""),
-            primary      = c_primary,
-            accent       = c_accent,
-        )
-        final.append({**concept, "svg": svg})
 
-    print(f"[visual_identity_agent] Built {len(final)} deterministic SVGs")
+        num  = concept.get("number", i + 1)
+        name = concept.get("name", "")
+        approach   = concept.get("approach", "")
+        direction  = concept.get("direction", approach)
+        rationale  = concept.get("rationale", "")
+
+        print(f"[visual_identity_agent] SVG {i+1}/{len(concepts)}: {name} ({approach})")
+
+        wm  = _wordmark(brand_name, abbreviation, num, name, c_primary, c_accent)
+        sym = ""
+
+        # ── Attempt: GPT-4o brand-specific symbol ────────────────────────────
+        try:
+            user_prompt = _SYMBOL_USER_TMPL.format(
+                brand=brand_name, abbr=abbreviation, tagline=tagline,
+                approach=approach, name=name,
+                direction=direction, rationale=rationale,
+                primary=c_primary, accent=c_accent,
+            )
+            raw = await call_openai(
+                system_prompt=_SYMBOL_SYSTEM,
+                user_prompt=user_prompt,
+                model="gpt-4o",
+                temperature=0.6,
+                max_tokens=1200,
+                json_mode=False,
+            )
+            sym = _extract_svg_elements(raw)
+        except Exception as exc:
+            print(f"[visual_identity_agent] GPT-4o failed for concept {num}: {exc}")
+
+        # ── Fallback: deterministic geometric template ────────────────────────
+        if not sym or len(sym) < 40:
+            print(f"[visual_identity_agent] Using deterministic fallback for concept {num}")
+            fallback_svg = _build_deterministic_svg(
+                approach=approach, brand_name=brand_name, abbreviation=abbreviation,
+                concept_num=num, concept_name=name, primary=c_primary, accent=c_accent,
+            )
+            final.append({**concept, "svg": fallback_svg})
+            continue
+
+        final.append({**concept, "svg": _wrap_svg(sym, wm)})
+
+    ai_ok = sum(1 for c in final if c.get("svg") and "SVG pending" not in c["svg"])
+    print(f"[visual_identity_agent] SVGs complete: {ai_ok}/{len(final)}")
     return final
 
 
@@ -618,12 +738,12 @@ async def run(
 
     print(f"[visual_identity_agent] Brief done — {len(concepts)} concepts, colors: {primary_color} / {accent_color}")
 
-    # ── Step 2: Build deterministic SVGs (pure Python, instant) ─────────────
+    # ── Step 2: Generate brand-specific SVGs (GPT-4o + deterministic fallback) ─
     concepts_with_svg: list[dict] = []
     if concepts:
-        print(f"[visual_identity_agent] Step 2 — building {len(concepts)} deterministic SVGs")
-        concepts_with_svg = _generate_concept_svgs(
-            brand_name, abbreviation, concepts, primary_color, accent_color
+        print(f"[visual_identity_agent] Step 2 — generating {len(concepts)} brand-specific SVGs")
+        concepts_with_svg = await _generate_concept_svgs(
+            brand_name, abbreviation, tagline, concepts, primary_color, accent_color
         )
     else:
         print("[visual_identity_agent] No concepts — skipping SVG generation")

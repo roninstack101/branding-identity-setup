@@ -66,30 +66,35 @@ async def call_openai(
     temperature: float = 0.7,
     max_tokens: int = 2048,
     model: str = "gpt-4o-mini",
+    json_mode: bool = True,
 ) -> str:
-    """Send a chat completion request to OpenAI and return the assistant message text."""
+    """Send a chat completion request to OpenAI and return the assistant message text.
+    Set json_mode=False to get raw text output (e.g. for SVG generation)."""
     if not os.getenv("OPENAI_API_KEY", "").strip():
         print("[OpenAI] Warning: OPENAI_API_KEY not set, returning empty fallback.")
-        return "{}"
+        return "" if not json_mode else "{}"
+
+    kwargs: dict = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+    if json_mode:
+        kwargs["response_format"] = {"type": "json_object"}
 
     try:
-        response = await _openai_client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_format={"type": "json_object"},
-        )
-        return response.choices[0].message.content or "{}"
+        response = await _openai_client.chat.completions.create(**kwargs)
+        return response.choices[0].message.content or ("" if not json_mode else "{}")
     except Exception as exc:
         if _STRICT_ERRORS:
             raise
 
         print(f"[OpenAI] Warning: {type(exc).__name__}: {str(exc)[:220]}")
-        return "{}"
+        return "" if not json_mode else "{}"
 
 
 async def generate_logo_image(prompt: str) -> dict:
