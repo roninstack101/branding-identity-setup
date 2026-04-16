@@ -1,6 +1,8 @@
 """
 Gemini utility – uses Google Gemini with Search Grounding.
-Used by market_research and competitor_analysis agents for real-time web data.
+  - call_gemini_with_search → Gemini + Google Search, returns extracted JSON
+  - call_gemini_for_svg     → Gemini without search, returns raw SVG string
+Used by market_research, competitor_analysis, and visual_identity agents.
 """
 import os
 import re
@@ -88,3 +90,45 @@ async def call_gemini_with_search(
     except Exception as exc:
         print(f"[Gemini] Warning: {type(exc).__name__}: {str(exc)[:220]}")
         return "{}"
+
+
+async def call_gemini_for_svg(prompt: str) -> str:
+    """
+    Call Gemini (no search grounding) and return raw SVG markup.
+    Strips any markdown fences and sanitises dangerous tags before returning.
+    Returns empty string on failure.
+    """
+    if not os.getenv("GEMINI_API_KEY", "").strip():
+        print("[Gemini SVG] Warning: GEMINI_API_KEY not set, skipping.")
+        return ""
+
+    try:
+        client = _get_client()
+        response = await client.aio.models.generate_content(
+            model=_GEMINI_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.3,
+                max_output_tokens=8192,
+            ),
+        )
+        raw = response.text or ""
+
+        # Extract the SVG block (may be wrapped in markdown fences)
+        match = re.search(r"<svg[\s\S]*?</svg>", raw, re.IGNORECASE)
+        if not match:
+            print(f"[Gemini SVG] No <svg> found in response. raw[:200]: {raw[:200]}")
+            return ""
+
+        svg = match.group(0)
+
+        # Basic XSS sanitisation — strip script tags and event handler attrs
+        svg = re.sub(r"<script[\s\S]*?</script>", "", svg, flags=re.IGNORECASE)
+        svg = re.sub(r'\s+on\w+="[^"]*"', "", svg)
+        svg = re.sub(r"\s+on\w+='[^']*'", "", svg)
+
+        return svg
+
+    except Exception as exc:
+        print(f"[Gemini SVG] Error: {type(exc).__name__}: {str(exc)[:220]}")
+        return ""
