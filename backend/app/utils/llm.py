@@ -1,7 +1,8 @@
 """
 LLM utility – multi-provider support.
-  - call_llm      → Groq (Llama 3.3 70B)   – fast, free, structured JSON
-  - call_openai   → OpenAI (GPT-4o mini)    – creative writing, reasoning, feedback
+  - call_llm            → Groq (Llama 3.3 70B)   – fast, free, structured JSON
+  - call_openai         → OpenAI (GPT-4o mini)    – creative writing, reasoning, feedback
+  - generate_logo_image → OpenAI image generation – logo concept grid (gpt-image-1 → dall-e-3)
 """
 import os
 from dotenv import load_dotenv
@@ -89,3 +90,52 @@ async def call_openai(
 
         print(f"[OpenAI] Warning: {type(exc).__name__}: {str(exc)[:220]}")
         return "{}"
+
+
+async def generate_logo_image(prompt: str) -> dict:
+    """
+    Generate a logo concepts grid image.
+    Tries gpt-image-1 first (best logo quality), falls back to dall-e-3.
+    Returns {"b64_json": ..., "model": ..., "error": ...}
+    """
+    if not os.getenv("OPENAI_API_KEY", "").strip():
+        print("[Image] ERROR: OPENAI_API_KEY not set")
+        return {"error": "OPENAI_API_KEY not set"}
+
+    truncated = prompt[:4000]
+
+    # Attempt 1: gpt-image-1 (ChatGPT-quality logo generation)
+    try:
+        response = await _openai_client.images.generate(
+            model="gpt-image-1",
+            prompt=truncated,
+            n=1,
+            size="1536x1024",
+        )
+        item = response.data[0]
+        b64 = getattr(item, "b64_json", None)
+        if b64:
+            print("[Image] Generated with gpt-image-1")
+            return {"b64_json": b64, "model": "gpt-image-1"}
+    except Exception as exc:
+        print(f"[Image] gpt-image-1 failed: {type(exc).__name__}: {str(exc)[:200]}")
+
+    # Attempt 2: dall-e-3 (widely available fallback)
+    try:
+        response = await _openai_client.images.generate(
+            model="dall-e-3",
+            prompt=truncated,
+            n=1,
+            size="1792x1024",
+            quality="hd",
+            response_format="b64_json",
+        )
+        item = response.data[0]
+        b64 = getattr(item, "b64_json", None)
+        if b64:
+            print("[Image] Generated with dall-e-3")
+            return {"b64_json": b64, "model": "dall-e-3"}
+    except Exception as exc:
+        print(f"[Image] dall-e-3 failed: {type(exc).__name__}: {str(exc)[:200]}")
+
+    return {"error": "Image generation failed — check API key tier and logs"}

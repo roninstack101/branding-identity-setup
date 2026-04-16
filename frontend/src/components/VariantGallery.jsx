@@ -1,60 +1,27 @@
-import { useState, useEffect, useCallback } from 'react';
-import { regenerateVariant } from '../services/api';
-import ColorPalettePicker from './ColorPalettePicker';
+import { useState } from 'react';
 
-// ── Google Fonts Catalog ──────────────────────────────────────────────────────
-const GOOGLE_FONTS_CATALOG = {
-  'Sans-Serif': [
-    'Inter', 'Roboto', 'Open Sans', 'Montserrat', 'Poppins', 'Raleway',
-    'Nunito', 'Work Sans', 'DM Sans', 'Space Grotesk', 'Outfit', 'Archivo',
-    'Manrope', 'Plus Jakarta Sans', 'Figtree', 'Albert Sans', 'Urbanist',
-    'Sora', 'Red Hat Display', 'Geist',
-  ],
-  'Serif': [
-    'Playfair Display', 'Lora', 'Merriweather', 'Crimson Text', 'Source Serif 4',
-    'Roboto Slab', 'DM Serif Display', 'Libre Baskerville', 'Cormorant Garamond',
-    'EB Garamond', 'Bitter', 'Spectral', 'Vollkorn', 'Bodoni Moda',
-    'Fraunces', 'Newsreader', 'Literata',
-  ],
-  'Display': [
-    'Bebas Neue', 'Oswald', 'Anton', 'Abril Fatface', 'Righteous', 'Bungee',
-    'Orbitron', 'Passion One', 'Black Ops One', 'Lilita One',
-    'Fredoka One', 'Titan One', 'Staatliches',
-  ],
-  'Handwriting': [
-    'Caveat', 'Pacifico', 'Dancing Script', 'Permanent Marker', 'Satisfy',
-    'Great Vibes', 'Lobster', 'Sacramento', 'Amatic SC', 'Indie Flower',
-    'Kalam', 'Architects Daughter',
-  ],
-  'Monospace': [
-    'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'IBM Plex Mono',
-    'Space Mono', 'Roboto Mono', 'Ubuntu Mono',
-  ],
+// ── Archetype config ──────────────────────────────────────────────────────────
+const ARCHETYPE_COLORS = {
+  'Interlocked Monogram': { color: '#818cf8', bg: 'rgba(129,140,248,0.1)',  border: 'rgba(129,140,248,0.25)' },
+  'Ecosystem Orbit':      { color: '#34d399', bg: 'rgba(52,211,153,0.1)',   border: 'rgba(52,211,153,0.25)'  },
+  'Growth Stack':         { color: '#60a5fa', bg: 'rgba(96,165,250,0.1)',   border: 'rgba(96,165,250,0.25)'  },
+  'Bridge Arc':           { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)',   border: 'rgba(245,158,11,0.25)'  },
+  'Tri-form Overlap':     { color: '#c084fc', bg: 'rgba(192,132,252,0.1)',  border: 'rgba(192,132,252,0.25)' },
+  'Network Nodes':        { color: '#38bdf8', bg: 'rgba(56,189,248,0.1)',   border: 'rgba(56,189,248,0.25)'  },
+  'Dynamic Sweep':        { color: '#fb923c', bg: 'rgba(251,146,60,0.1)',   border: 'rgba(251,146,60,0.25)'  },
+  'Digital Grid':         { color: '#a3e635', bg: 'rgba(163,230,53,0.1)',   border: 'rgba(163,230,53,0.25)'  },
+  'Globe / Planet':       { color: '#2dd4bf', bg: 'rgba(45,212,191,0.1)',   border: 'rgba(45,212,191,0.25)'  },
+  'Journey Swoosh + Dot': { color: '#f472b6', bg: 'rgba(244,114,182,0.1)',  border: 'rgba(244,114,182,0.25)' },
 };
 
-const ALL_FONTS = Object.values(GOOGLE_FONTS_CATALOG).flat();
-
-// ── Font loader ───────────────────────────────────────────────────────────────
-function loadFont(fontName) {
-  if (!fontName) return;
-  const id = `gfont-${fontName.replace(/\s+/g, '-').toLowerCase()}`;
-  if (document.getElementById(id)) return;
-  const link = document.createElement('link');
-  link.id = id;
-  link.rel = 'stylesheet';
-  link.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(fontName)}:wght@400;500;600;700;800&display=swap`;
-  document.head.appendChild(link);
+function getArchetypeStyle(approach = '') {
+  for (const [key, val] of Object.entries(ARCHETYPE_COLORS)) {
+    if (approach.includes(key.split('/')[0].trim())) return val;
+  }
+  return { color: '#94a3b8', bg: 'rgba(148,163,184,0.1)', border: 'rgba(148,163,184,0.2)' };
 }
 
-function useGoogleFont(fontName) {
-  useEffect(() => { loadFont(fontName); }, [fontName]);
-}
-
-function loadGoogleFonts(fonts) {
-  fonts.filter(Boolean).forEach(loadFont);
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Copy hook ─────────────────────────────────────────────────────────────────
 function useCopy(timeout = 2000) {
   const [copied, setCopied] = useState(false);
   const copy = (text) => {
@@ -65,744 +32,39 @@ function useCopy(timeout = 2000) {
   return [copied, copy];
 }
 
-// ── Prompt Block ──────────────────────────────────────────────────────────────
-function PromptBlock({ label, icon, accentColor, borderColor, prompt }) {
-  const [copiedIdeo, copyIdeo] = useCopy();
-
-  if (!prompt) return null;
-
-  const { concept, ideogram_prompt, designer_brief } = prompt;
-
-  return (
-    <div
-      className="rounded-2xl p-5 space-y-4"
-      style={{
-        background: `linear-gradient(135deg, ${accentColor}10, ${accentColor}06)`,
-        border: `1px solid ${borderColor}`,
-      }}
-    >
-      {/* Header */}
-      <div className="flex items-center gap-2">
-        <span className="text-base">{icon}</span>
-        <span className="text-sm font-black tracking-wide" style={{ color: accentColor }}>{label}</span>
-      </div>
-
-      {/* Concept */}
-      {concept && (
-        <div className="space-y-1">
-          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/30">Concept</div>
-          <p className="text-xs text-white/60 leading-relaxed">{concept}</p>
-        </div>
-      )}
-
-      {/* Ideogram prompt */}
-      {ideogram_prompt && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/30">Ideogram AI</div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => copyIdeo(ideogram_prompt)}
-                className="text-[10px] px-2.5 py-1 rounded-lg font-bold transition-all"
-                style={{
-                  background: copiedIdeo ? 'rgba(16,185,129,0.15)' : `${accentColor}18`,
-                  border: `1px solid ${copiedIdeo ? 'rgba(16,185,129,0.4)' : borderColor}`,
-                  color: copiedIdeo ? '#10b981' : accentColor,
-                }}
-              >
-                {copiedIdeo ? '✓ Copied' : 'Copy'}
-              </button>
-              <a
-                href="https://ideogram.ai/t/explore"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[10px] px-2.5 py-1 rounded-lg font-bold no-underline transition-all"
-                style={{ background: `${accentColor}18`, border: `1px solid ${borderColor}`, color: accentColor }}
-              >
-                Open ↗
-              </a>
-            </div>
-          </div>
-          <p className="text-xs text-white/50 leading-relaxed italic bg-white/[0.03] rounded-lg p-3 border border-white/[0.06]">
-            {ideogram_prompt}
-          </p>
-        </div>
-      )}
-
-      {/* Designer brief */}
-      {designer_brief && (
-        <div className="space-y-1">
-          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-white/25">Designer Brief</div>
-          <p className="text-xs text-white/40 leading-relaxed">{designer_brief}</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Color Version Block ───────────────────────────────────────────────────────
-function ColorVersionBlock({ label, icon, accentColor, borderColor, prompt }) {
+// ── Generated Image Panel ─────────────────────────────────────────────────────
+function GeneratedImagePanel({ imageUrl, imageModel, imageError, imagePrompt, onRegenerate }) {
+  const [showPrompt, setShowPrompt] = useState(false);
   const [copied, copy] = useCopy();
-  if (!prompt) return null;
-  return (
-    <div
-      className="rounded-2xl p-4 space-y-3"
-      style={{
-        background: `linear-gradient(135deg, ${accentColor}0d, ${accentColor}06)`,
-        border: `1px solid ${borderColor}`,
-      }}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-base" style={{ color: accentColor }}>{icon}</span>
-          <span className="text-sm font-black tracking-wide" style={{ color: accentColor }}>{label}</span>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => copy(prompt)}
-            className="text-[10px] px-2.5 py-1 rounded-lg font-bold transition-all"
-            style={{
-              background: copied ? 'rgba(16,185,129,0.15)' : `${accentColor}18`,
-              border: `1px solid ${copied ? 'rgba(16,185,129,0.4)' : borderColor}`,
-              color: copied ? '#10b981' : accentColor,
-            }}
-          >
-            {copied ? '✓ Copied' : 'Copy'}
-          </button>
-          <a
-            href="https://ideogram.ai/t/explore"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[10px] px-2.5 py-1 rounded-lg font-bold no-underline transition-all"
-            style={{ background: `${accentColor}18`, border: `1px solid ${borderColor}`, color: accentColor }}
-          >
-            Open ↗
-          </a>
-        </div>
-      </div>
-      <p className="text-xs text-white/50 leading-relaxed italic bg-white/[0.03] rounded-lg p-3 border border-white/[0.06]">
-        {prompt}
-      </p>
-    </div>
-  );
-}
 
-// ── Font Picker Modal ─────────────────────────────────────────────────────────
-function FontPickerModal({ type, currentFont, onSelect, onClose }) {
-  const [search, setSearch] = useState('');
+  const hasImage = Boolean(imageUrl);
 
-  const filtered = search.trim()
-    ? { 'Search Results': ALL_FONTS.filter((f) => f.toLowerCase().includes(search.toLowerCase())) }
-    : GOOGLE_FONTS_CATALOG;
-
-  useEffect(() => { ALL_FONTS.forEach(loadFont); }, []);
-
-  return (
-    <div
-      className="fixed inset-0 z-[60] flex items-end md:items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-2xl bg-slate-950 border border-white/10 rounded-3xl shadow-2xl flex flex-col"
-        style={{ maxHeight: '80vh' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-white/10 flex-shrink-0">
-          <div>
-            <h3 className="text-white font-black text-lg">
-              {type === 'heading' ? 'Heading' : 'Body'} Font
-            </h3>
-            <p className="text-white/40 text-xs mt-0.5">Google Fonts — click to apply</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-all"
-          >✕</button>
-        </div>
-
-        <div className="px-6 py-3 flex-shrink-0">
-          <input
-            type="text"
-            autoFocus
-            placeholder="Search fonts…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-white/30"
-          />
-        </div>
-
-        <div className="overflow-y-auto flex-1 px-6 pb-6 space-y-6">
-          {Object.entries(filtered).map(([category, fonts]) =>
-            fonts.length === 0 ? null : (
-              <div key={category}>
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-400/70 mb-3">{category}</div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {fonts.map((font) => {
-                    const isActive = currentFont === font;
-                    return (
-                      <button
-                        key={font}
-                        onClick={() => onSelect(font)}
-                        className="p-3 rounded-xl text-left transition-all hover:border-white/25"
-                        style={{
-                          background: isActive ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.02)',
-                          border: isActive ? '1px solid rgba(59,130,246,0.4)' : '1px solid rgba(255,255,255,0.07)',
-                        }}
-                      >
-                        <span
-                          className="block text-sm mb-1 text-white truncate"
-                          style={{ fontFamily: `'${font}', sans-serif`, fontWeight: type === 'heading' ? 700 : 400 }}
-                        >
-                          {font}
-                        </span>
-                        <span className="text-[10px] text-white/35" style={{ fontFamily: `'${font}', sans-serif` }}>
-                          Aa Bb 123
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Variant Modal ─────────────────────────────────────────────────────────────
-function VariantModal({ variant, variantIndex, projectId, onClose, onUpdated }) {
-  const [editedColors, setEditedColors] = useState([...(variant.color_palette || [])]);
-  const [headingFont,  setHeadingFont]  = useState(variant.heading_font || '');
-  const [bodyFont,     setBodyFont]     = useState(variant.body_font    || '');
-  const [fontPicker,   setFontPicker]   = useState(null);
-  const [regenerating, setRegenerating] = useState(false);
-  const [regenError,   setRegenError]   = useState('');
-  const [localVariant, setLocalVariant] = useState(variant);
-
-  useGoogleFont(headingFont);
-  useGoogleFont(bodyFont);
-
-  const colorsChanged  = editedColors.some((c, i) => c !== (variant.color_palette || [])[i]);
-  const headingChanged = headingFont !== (variant.heading_font || '');
-  const bodyChanged    = bodyFont    !== (variant.body_font    || '');
-  const anyChanged     = colorsChanged || headingChanged || bodyChanged;
-
-  const handleRegenerate = async () => {
-    setRegenerating(true);
-    setRegenError('');
-    try {
-      const res = await regenerateVariant(
-        projectId, variantIndex, editedColors,
-        headingChanged ? headingFont : undefined,
-        bodyChanged    ? bodyFont    : undefined,
-      );
-      const updated = res.data.variant;
-      setLocalVariant(updated);
-      setEditedColors([...(updated.color_palette || [])]);
-      setHeadingFont(updated.heading_font || '');
-      setBodyFont(updated.body_font    || '');
-      onUpdated(variantIndex, updated);
-    } catch (err) {
-      setRegenError(err.response?.data?.detail || 'Regeneration failed');
-    } finally {
-      setRegenerating(false);
-    }
+  // Download handler
+  const handleDownload = () => {
+    const a = document.createElement('a');
+    a.href = imageUrl;
+    a.download = 'logo-concepts.png';
+    a.click();
   };
 
-  const handleReset = () => {
-    setEditedColors([...(variant.color_palette || [])]);
-    setHeadingFont(variant.heading_font || '');
-    setBodyFont(variant.body_font    || '');
-  };
-
-  const primary   = editedColors[0] || '#6366f1';
-  const secondary = editedColors[1] || '#8b5cf6';
-  const bgColor   = editedColors[4] || '#f5f5f5';
-
-  return (
-    <>
-      <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-        onClick={onClose}
-      >
-        <div
-          className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-slate-950 border border-white/10 rounded-3xl shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Close */}
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-all"
-          >✕</button>
-
-          <div className="p-8 space-y-6">
-            {/* ── Header ── */}
-            <div className="space-y-2">
-              {localVariant.visual_approach && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/12 border border-amber-500/25 text-amber-300 text-[11px] font-bold">
-                  <span className="opacity-70">⬡</span>
-                  {localVariant.visual_approach}
-                </div>
-              )}
-              <h2
-                className="text-2xl font-black text-white"
-                style={{ fontFamily: `'${headingFont}', sans-serif` }}
-              >
-                {localVariant.variant_name}
-              </h2>
-              {localVariant.creative_rationale && (
-                <div className="rounded-xl px-4 py-3 bg-amber-500/6 border border-amber-500/18">
-                  <p className="text-sm text-amber-100/70 leading-relaxed italic">
-                    "{localVariant.creative_rationale}"
-                  </p>
-                </div>
-              )}
-              {localVariant.visual_strategy && (
-                <p className="text-sm text-white/40 leading-relaxed">{localVariant.visual_strategy}</p>
-              )}
-            </div>
-
-            {/* ── Brand Preview Strip ── */}
-            <div
-              className="rounded-2xl overflow-hidden border border-white/10"
-              style={{ background: bgColor }}
-            >
-              <div className="px-8 py-10 flex flex-col items-center justify-center gap-2 min-h-[120px]">
-                <div
-                  className="text-3xl font-black tracking-tight leading-none"
-                  style={{ fontFamily: `'${headingFont}', sans-serif`, color: primary }}
-                >
-                  {localVariant.variant_name}
-                </div>
-                <div
-                  className="text-xs tracking-widest uppercase"
-                  style={{ fontFamily: `'${bodyFont}', sans-serif`, color: secondary, opacity: 0.8 }}
-                >
-                  Brand Identity Preview
-                </div>
-                {/* Mini palette bar */}
-                <div className="flex gap-1 mt-3">
-                  {editedColors.map((hex, i) => (
-                    <div key={i} className="w-6 h-6 rounded-full border-2 border-white/20" style={{ backgroundColor: hex }} />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* ── Logo Motivation ── */}
-            {localVariant.logo_motivation && (
-              <div className="rounded-xl p-4 bg-amber-500/5 border border-amber-500/20 space-y-1">
-                <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-400/70">Logo Motivation</div>
-                <p className="text-xs text-white/55 leading-relaxed">{localVariant.logo_motivation}</p>
-              </div>
-            )}
-
-            {/* ── Brand Emotion ── */}
-            {localVariant.brand_emotion && (
-              <div className="rounded-2xl overflow-hidden border border-pink-500/20">
-                <div className="px-4 py-2.5 bg-pink-500/10 border-b border-pink-500/15 flex items-center gap-2">
-                  <span className="text-pink-400 text-sm">◉</span>
-                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-pink-400/80">Brand Emotion &amp; Voice</span>
-                </div>
-                <div className="p-4 space-y-3">
-                  {localVariant.brand_emotion.primary_emotion && (
-                    <div className="flex items-center gap-3">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-pink-400/60 w-28 flex-shrink-0">Core Emotion</span>
-                      <span
-                        className="text-sm font-black px-3 py-1 rounded-full"
-                        style={{ background: `${primary}22`, color: primary, border: `1px solid ${primary}44` }}
-                      >
-                        {localVariant.brand_emotion.primary_emotion}
-                      </span>
-                    </div>
-                  )}
-                  {localVariant.brand_emotion.emotional_language && (
-                    <div className="flex gap-3 items-start">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-pink-400/60 w-28 flex-shrink-0 pt-0.5">Visual Language</span>
-                      <span className="text-xs text-white/60 leading-relaxed">{localVariant.brand_emotion.emotional_language}</span>
-                    </div>
-                  )}
-                  {localVariant.brand_emotion.voice_translation && (
-                    <div className="flex gap-3 items-start">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-pink-400/60 w-28 flex-shrink-0 pt-0.5">Voice → Visual</span>
-                      <span className="text-xs text-white/60 leading-relaxed">{localVariant.brand_emotion.voice_translation}</span>
-                    </div>
-                  )}
-                  {localVariant.brand_emotion.audience_resonance && (
-                    <div className="flex gap-3 items-start">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-pink-400/60 w-28 flex-shrink-0 pt-0.5">Audience Fit</span>
-                      <span className="text-xs text-white/60 leading-relaxed">{localVariant.brand_emotion.audience_resonance}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* ── Competitive Positioning ── */}
-            {localVariant.competitive_positioning && (
-              <div className="rounded-2xl overflow-hidden border border-rose-500/20">
-                <div className="px-4 py-2.5 bg-rose-500/10 border-b border-rose-500/15">
-                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-400/80">Competitive Positioning</span>
-                </div>
-                <div className="p-4 space-y-3">
-                  {localVariant.competitive_positioning.differentiates_from && (
-                    <div className="flex gap-3 items-start">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-rose-400/60 w-28 flex-shrink-0 pt-0.5">vs Competitors</span>
-                      <span className="text-xs text-white/60 leading-relaxed">{localVariant.competitive_positioning.differentiates_from}</span>
-                    </div>
-                  )}
-                  {localVariant.competitive_positioning.how_different && (
-                    <div className="flex gap-3 items-start">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-rose-400/60 w-28 flex-shrink-0 pt-0.5">How Different</span>
-                      <span className="text-xs text-white/60 leading-relaxed">{localVariant.competitive_positioning.how_different}</span>
-                    </div>
-                  )}
-                  {localVariant.competitive_positioning.trend_captured && (
-                    <div className="flex gap-3 items-start">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400/60 w-28 flex-shrink-0 pt-0.5">Trend Owned</span>
-                      <span className="text-xs text-emerald-300/70 leading-relaxed">{localVariant.competitive_positioning.trend_captured}</span>
-                    </div>
-                  )}
-                  {localVariant.competitive_positioning.white_space_claimed && (
-                    <div className="flex gap-3 items-start">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400/60 w-28 flex-shrink-0 pt-0.5">White Space</span>
-                      <span className="text-xs text-indigo-300/70 leading-relaxed">{localVariant.competitive_positioning.white_space_claimed}</span>
-                    </div>
-                  )}
-                  {localVariant.competitive_positioning.industry_standard_used && (
-                    <div className="flex gap-3 items-start">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-cyan-400/60 w-28 flex-shrink-0 pt-0.5">Std. Followed</span>
-                      <span className="text-xs text-cyan-300/60 leading-relaxed">{localVariant.competitive_positioning.industry_standard_used}</span>
-                    </div>
-                  )}
-                  {localVariant.competitive_positioning.industry_standard_broken && (
-                    <div className="flex gap-3 items-start">
-                      <span className="text-[9px] font-black uppercase tracking-widest text-orange-400/60 w-28 flex-shrink-0 pt-0.5">Cliché Broken</span>
-                      <span className="text-xs text-orange-300/60 leading-relaxed">{localVariant.competitive_positioning.industry_standard_broken}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* ── Color Palette ── */}
-            <div className="space-y-2">
-              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Color Palette</div>
-              <ColorPalettePicker palette={editedColors} onChange={setEditedColors} />
-            </div>
-
-            {/* Color Roles */}
-            {localVariant.color_roles && (
-              <div className="space-y-1.5">
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">Color Roles</div>
-                {Object.entries(localVariant.color_roles).map(([role, desc]) => (
-                  <div key={role} className="flex gap-3 items-start text-xs">
-                    <span className="font-black uppercase tracking-widest text-white/30 w-24 flex-shrink-0 pt-0.5">{role}</span>
-                    <span className="text-white/60 leading-relaxed">{desc}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* ── Typography ── */}
-            <div className="space-y-3">
-              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Typography</div>
-              <div className="grid grid-cols-2 gap-4">
-                {/* Heading font */}
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300/70">Heading</div>
-                    <button
-                      onClick={() => setFontPicker('heading')}
-                      className="text-[10px] px-2 py-0.5 rounded-lg transition-all"
-                      style={{
-                        background: headingChanged ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.05)',
-                        border: headingChanged ? '1px solid rgba(59,130,246,0.4)' : '1px solid rgba(255,255,255,0.1)',
-                        color: headingChanged ? '#93c5fd' : 'rgba(255,255,255,0.4)',
-                      }}
-                    >
-                      {headingChanged ? '✓ Changed' : 'Change'}
-                    </button>
-                  </div>
-                  <div className="text-white/40 text-[10px] font-mono truncate">{headingFont}</div>
-                  <div className="text-white text-xl font-bold leading-tight" style={{ fontFamily: `'${headingFont}', sans-serif` }}>
-                    Aa Bb Cc 123
-                  </div>
-                </div>
-
-                {/* Body font */}
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-300/70">Body</div>
-                    <button
-                      onClick={() => setFontPicker('body')}
-                      className="text-[10px] px-2 py-0.5 rounded-lg transition-all"
-                      style={{
-                        background: bodyChanged ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.05)',
-                        border: bodyChanged ? '1px solid rgba(139,92,246,0.4)' : '1px solid rgba(255,255,255,0.1)',
-                        color: bodyChanged ? '#c4b5fd' : 'rgba(255,255,255,0.4)',
-                      }}
-                    >
-                      {bodyChanged ? '✓ Changed' : 'Change'}
-                    </button>
-                  </div>
-                  <div className="text-white/40 text-[10px] font-mono truncate">{bodyFont}</div>
-                  <div className="text-white text-base leading-relaxed" style={{ fontFamily: `'${bodyFont}', sans-serif` }}>
-                    Aa Bb Cc 123
-                  </div>
-                </div>
-              </div>
-              {localVariant.font_pairing_rationale && (
-                <p className="text-xs text-white/35 leading-relaxed">{localVariant.font_pairing_rationale}</p>
-              )}
-            </div>
-
-            {/* ── Changed banner ── */}
-            {anyChanged && (
-              <div className="flex gap-3 p-4 rounded-2xl border border-blue-500/20 bg-blue-500/5">
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold text-blue-300">
-                    {[colorsChanged && 'palette', headingChanged && 'heading font', bodyChanged && 'body font']
-                      .filter(Boolean).join(' + ')} changed
-                  </div>
-                  <div className="text-xs text-white/40 mt-0.5">
-                    Apply to update hex codes in all logo prompts
-                  </div>
-                </div>
-                <button
-                  onClick={handleReset}
-                  className="flex-shrink-0 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white/50 hover:text-white text-xs font-bold transition-all"
-                >
-                  Reset
-                </button>
-                <button
-                  onClick={handleRegenerate}
-                  disabled={regenerating}
-                  className="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-black transition-all"
-                >
-                  {regenerating
-                    ? <><span className="w-3 h-3 border border-white/40 border-t-white rounded-full animate-spin" />Applying…</>
-                    : '✦ Apply Changes'}
-                </button>
-              </div>
-            )}
-
-            {regenError && (
-              <div className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 rounded-xl p-3">⚠ {regenError}</div>
-            )}
-
-            {/* ── Wordmark Prompt ── */}
-            <PromptBlock
-              label="Wordmark Logo Prompt"
-              icon="✍️"
-              accentColor="#818cf8"
-              borderColor="rgba(99,102,241,0.25)"
-              prompt={localVariant.wordmark_prompt}
-            />
-
-            {/* ── Logomark Prompt ── */}
-            <PromptBlock
-              label="Logomark / Symbol Prompt"
-              icon="◈"
-              accentColor="#34d399"
-              borderColor="rgba(52,211,153,0.25)"
-              prompt={localVariant.logomark_prompt}
-            />
-
-            {/* ── Color Versions ── */}
-            {localVariant.color_versions && (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">3 Color Versions</span>
-                  <span className="text-[10px] text-white/20">— Ideogram prompts ready for each application</span>
-                </div>
-                {localVariant.color_versions.full_color && (
-                  <ColorVersionBlock
-                    label="Full Color"
-                    icon="◑"
-                    accentColor="#f59e0b"
-                    borderColor="rgba(245,158,11,0.25)"
-                    prompt={localVariant.color_versions.full_color}
-                  />
-                )}
-                {localVariant.color_versions.monochrome && (
-                  <ColorVersionBlock
-                    label="Monochrome"
-                    icon="◐"
-                    accentColor="#94a3b8"
-                    borderColor="rgba(148,163,184,0.25)"
-                    prompt={localVariant.color_versions.monochrome}
-                  />
-                )}
-                {localVariant.color_versions.dark_background && (
-                  <ColorVersionBlock
-                    label="Dark Background"
-                    icon="●"
-                    accentColor="#818cf8"
-                    borderColor="rgba(129,140,248,0.25)"
-                    prompt={localVariant.color_versions.dark_background}
-                  />
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {fontPicker && (
-        <FontPickerModal
-          type={fontPicker}
-          currentFont={fontPicker === 'heading' ? headingFont : bodyFont}
-          onSelect={(font) => {
-            fontPicker === 'heading' ? setHeadingFont(font) : setBodyFont(font);
-            setFontPicker(null);
-          }}
-          onClose={() => setFontPicker(null)}
-        />
-      )}
-    </>
-  );
-}
-
-// ── Gallery Card ──────────────────────────────────────────────────────────────
-function GalleryCard({ variant, onClick }) {
-  useEffect(() => {
-    loadGoogleFonts([variant.heading_font, variant.body_font]);
-  }, [variant]);
-
-  const primary = variant.color_palette?.[0] || '#6366f1';
-  const bg      = variant.color_palette?.[4] || '#f5f5f5';
-
-  return (
-    <button
-      onClick={onClick}
-      className="group text-left rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/20 transition-all overflow-hidden"
-    >
-      {/* Brand preview area */}
-      <div
-        className="w-full h-32 flex flex-col items-center justify-center border-b border-white/5 gap-1 px-3"
-        style={{ background: bg }}
-      >
-        <div
-          className="text-base font-black tracking-tight text-center leading-tight truncate w-full text-center"
-          style={{ fontFamily: `'${variant.heading_font}', sans-serif`, color: primary }}
-        >
-          {variant.variant_name}
-        </div>
-        <div className="flex gap-0.5 mt-1">
-          {(variant.color_palette || []).slice(0, 4).map((hex, i) => (
-            <div key={i} className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: hex }} />
-          ))}
-        </div>
-      </div>
-
-      <div className="p-3 space-y-2">
-        <div className="flex items-start justify-between gap-1">
-          <div className="text-xs font-bold text-white leading-tight">{variant.variant_name}</div>
-          <span className="text-white/20 group-hover:text-white/50 transition-colors text-xs flex-shrink-0">↗</span>
-        </div>
-
-        {/* Visual approach archetype badge */}
-        {variant.visual_approach && (
-          <div className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300/80 truncate w-fit max-w-full">
-            {variant.visual_approach}
-          </div>
-        )}
-
-        {/* Creative rationale */}
-        {variant.creative_rationale && (
-          <p className="text-[10px] text-white/45 leading-snug italic line-clamp-2">
-            {variant.creative_rationale}
-          </p>
-        )}
-
-        {/* Palette bar */}
-        <div className="flex gap-0.5 rounded overflow-hidden h-3">
-          {(variant.color_palette || []).map((hex, i) => (
-            <div key={i} className="flex-1" style={{ backgroundColor: hex }} />
-          ))}
-        </div>
-
-        {/* Fonts */}
-        <div className="flex gap-1.5 flex-wrap">
-          {variant.heading_font && (
-            <span
-              className="text-[9px] px-1.5 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-cyan-300/70 truncate max-w-[80px]"
-              style={{ fontFamily: `'${variant.heading_font}', sans-serif` }}
-            >
-              {variant.heading_font}
-            </span>
-          )}
-          {variant.body_font && (
-            <span
-              className="text-[9px] px-1.5 py-0.5 rounded-md bg-violet-500/10 border border-violet-500/20 text-violet-300/70 truncate max-w-[80px]"
-              style={{ fontFamily: `'${variant.body_font}', sans-serif` }}
-            >
-              {variant.body_font}
-            </span>
-          )}
-        </div>
-
-        {/* Prompt indicators */}
-        <div className="flex gap-1 flex-wrap">
-          {variant.wordmark_prompt && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300/70">
-              ✍ Wordmark
-            </span>
-          )}
-          {variant.logomark_prompt && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-300/70">
-              ◈ Logomark
-            </span>
-          )}
-          {variant.color_versions && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-300/70">
-              ◑ 3 Colors
-            </span>
-          )}
-        </div>
-      </div>
-    </button>
-  );
-}
-
-// ── Main Export ───────────────────────────────────────────────────────────────
-export default function VariantGallery({ data, projectId, onRegenerate }) {
-  const [localVariants, setLocalVariants] = useState([]);
-  const [selected, setSelected]           = useState(null);
-
-  useEffect(() => {
-    const variants = Array.isArray(data?.variants) ? data.variants : [];
-    setLocalVariants(variants);
-    loadGoogleFonts(variants.flatMap((v) => [v.heading_font, v.body_font]));
-  }, [data]);
-
-  const handleVariantUpdated = useCallback((index, updatedVariant) => {
-    setLocalVariants((prev) => {
-      const next = [...prev];
-      next[index] = updatedVariant;
-      return next;
-    });
-    setSelected({ variant: updatedVariant, index });
-  }, []);
-
-  if (!data) return null;
-
-  if (localVariants.length === 0) {
+  if (!hasImage && imageError) {
     return (
       <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-8 text-center space-y-3">
         <div className="text-3xl opacity-40">⚠️</div>
-        <div className="text-white/60 font-bold">Visual Identity data is empty</div>
+        <div className="text-white/60 font-bold">Image generation failed</div>
         <div className="text-white/35 text-sm leading-relaxed max-w-md mx-auto">
-          The visual identity agent ran but returned no variants. This usually means
-          <span className="text-amber-300/80"> OPENAI_API_KEY is missing</span> in the backend <code className="bg-white/10 px-1 rounded">.env</code> file.
-          <br />Check EC2 backend logs for <code className="bg-white/10 px-1 rounded">[visual_identity_agent]</code> errors.
+          {imageError.includes('OPENAI_API_KEY') ? (
+            <>OPENAI_API_KEY is missing in the backend <code className="bg-white/10 px-1 rounded">.env</code> file.</>
+          ) : (
+            imageError
+          )}
+          {imageError.includes('tier') && (
+            <> gpt-image-1 requires OpenAI Tier 4+. DALL-E 3 requires an active paid plan.</>
+          )}
         </div>
         {onRegenerate && (
           <button
-            onClick={() => onRegenerate('visual_identity_agent', 'regenerate visual identity variants')}
+            onClick={() => onRegenerate('visual_identity_agent', 'regenerate logo concepts image')}
             className="mt-2 px-5 py-2 rounded-xl bg-white/5 border border-white/15 text-white/60 hover:text-white hover:bg-white/10 text-sm font-bold transition-all"
           >
             Retry
@@ -812,64 +74,308 @@ export default function VariantGallery({ data, projectId, onRegenerate }) {
     );
   }
 
-  const withWordmark    = localVariants.filter((v) => v.wordmark_prompt).length;
-  const withLogomark    = localVariants.filter((v) => v.logomark_prompt).length;
-  const withColorVers   = localVariants.filter((v) => v.color_versions).length;
+  if (!hasImage) return null;
+
+  return (
+    <div className="space-y-3">
+      {/* Image */}
+      <div className="relative group rounded-2xl overflow-hidden border border-white/10">
+        <img
+          src={imageUrl}
+          alt="10-concept logo design grid"
+          className="w-full block"
+          style={{ imageRendering: 'crisp-edges' }}
+        />
+
+        {/* Overlay actions */}
+        <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          {imageModel && (
+            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-black/60 text-white/70 border border-white/15 backdrop-blur-sm">
+              {imageModel}
+            </span>
+          )}
+          <button
+            onClick={handleDownload}
+            className="px-3 py-1 rounded-full text-[10px] font-bold bg-black/60 text-white/90 border border-white/20 backdrop-blur-sm hover:bg-white/10 transition-all"
+          >
+            ↓ Download
+          </button>
+        </div>
+      </div>
+
+      {/* Image prompt toggle */}
+      {imagePrompt && (
+        <div className="rounded-xl border border-white/8 overflow-hidden">
+          <button
+            onClick={() => setShowPrompt((p) => !p)}
+            className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/[0.02] transition-colors"
+          >
+            <span className="text-[11px] font-black uppercase tracking-[0.15em] text-white/30">
+              Image Generation Prompt
+            </span>
+            <span className="text-white/20 text-xs">{showPrompt ? '▲' : '▼'}</span>
+          </button>
+          {showPrompt && (
+            <div className="px-4 pb-4 space-y-2">
+              <div className="flex justify-end">
+                <button
+                  onClick={() => copy(imagePrompt)}
+                  className="text-[10px] px-2.5 py-1 rounded-lg font-bold transition-all"
+                  style={{
+                    background: copied ? 'rgba(16,185,129,0.15)' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${copied ? 'rgba(16,185,129,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                    color: copied ? '#10b981' : 'rgba(255,255,255,0.4)',
+                  }}
+                >
+                  {copied ? '✓ Copied' : 'Copy'}
+                </button>
+              </div>
+              <p className="text-[11px] text-white/35 leading-relaxed bg-white/[0.02] rounded-xl p-3 border border-white/5 italic">
+                {imagePrompt}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Design Brief Panel ────────────────────────────────────────────────────────
+function DesignBriefPanel({ briefText, competitorNotes, primaryColor, accentColor, font }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!briefText) return null;
+
+  // Render brief text with ━━━ headers styled
+  const renderBrief = (text) => {
+    return text.split('\n').map((line, i) => {
+      if (line.startsWith('━━━')) {
+        const title = line.replace(/━+/g, '').trim();
+        return title ? (
+          <div key={i} className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 mt-5 mb-2 pt-3 border-t border-white/5">
+            {title}
+          </div>
+        ) : null;
+      }
+      if (line.startsWith('•') || line.startsWith('-')) {
+        return <div key={i} className="text-[11px] text-white/45 leading-relaxed pl-3">{line}</div>;
+      }
+      if (line.trim() === '') return <div key={i} className="h-1" />;
+      return <div key={i} className="text-[11px] text-white/50 leading-relaxed">{line}</div>;
+    });
+  };
+
+  return (
+    <div className="rounded-2xl border border-white/8 overflow-hidden">
+      <button
+        onClick={() => setExpanded((e) => !e)}
+        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-white/[0.02] transition-colors"
+        style={{ background: 'rgba(255,255,255,0.015)' }}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-base">📋</span>
+          <div>
+            <div className="text-sm font-black text-white/80">Full Design Brief</div>
+            <div className="text-[10px] text-white/30 mt-0.5">Gemini research + 10-concept strategy</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Design tokens */}
+          <div className="hidden sm:flex items-center gap-2">
+            {primaryColor && (
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full border border-white/20" style={{ backgroundColor: primaryColor }} />
+                <span className="text-[9px] text-white/30 font-mono">{primaryColor}</span>
+              </div>
+            )}
+            {accentColor && (
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full border border-white/20" style={{ backgroundColor: accentColor }} />
+                <span className="text-[9px] text-white/30 font-mono">{accentColor}</span>
+              </div>
+            )}
+            {font && <span className="text-[9px] text-white/30">{font}</span>}
+          </div>
+          <span className="text-white/25 text-xs">{expanded ? '▲' : '▼'}</span>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-5 pb-5 space-y-1">
+          {competitorNotes && (
+            <div className="mb-4 p-3 rounded-xl bg-amber-500/5 border border-amber-500/15">
+              <div className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400/60 mb-1">
+                Competitor Visual Research
+              </div>
+              <p className="text-[11px] text-amber-100/50 leading-relaxed">{competitorNotes}</p>
+            </div>
+          )}
+          <div className="space-y-0.5">{renderBrief(briefText)}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Concept Card ──────────────────────────────────────────────────────────────
+function ConceptCard({ concept }) {
+  const style = getArchetypeStyle(concept.approach || '');
+
+  return (
+    <div
+      className="rounded-2xl p-4 space-y-2 border"
+      style={{ background: style.bg, borderColor: style.border }}
+    >
+      <div className="flex items-start gap-2">
+        <span
+          className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black flex-shrink-0 mt-0.5"
+          style={{ background: style.border, color: style.color }}
+        >
+          {concept.number}
+        </span>
+        <div className="min-w-0">
+          <div className="text-sm font-black text-white/85 leading-tight">{concept.name}</div>
+          <div className="text-[10px] font-bold mt-0.5" style={{ color: style.color }}>
+            {concept.approach}
+          </div>
+        </div>
+      </div>
+      {concept.rationale && (
+        <p className="text-[11px] text-white/45 leading-relaxed pl-8">{concept.rationale}</p>
+      )}
+    </div>
+  );
+}
+
+// ── Main Export ───────────────────────────────────────────────────────────────
+export default function VariantGallery({ data, projectId, onRegenerate }) {
+  if (!data) return null;
+
+  const imageUrl       = data.logo_image_url   || '';
+  const imageModel     = data.logo_image_model  || '';
+  const imageError     = data.logo_image_error  || '';
+  const briefText      = data.logo_design_brief || '';
+  const imagePrompt    = data.logo_image_prompt  || '';
+  const concepts       = Array.isArray(data.design_concepts) ? data.design_concepts : [];
+  const primaryColor   = data.primary_color     || '';
+  const accentColor    = data.accent_color      || '';
+  const font           = data.font              || '';
+  const compNotes      = data.competitor_visual_notes || '';
+
+  const hasAnything = imageUrl || briefText || concepts.length > 0;
+
+  if (!hasAnything) {
+    return (
+      <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-8 text-center space-y-3">
+        <div className="text-3xl opacity-40">⚠️</div>
+        <div className="text-white/60 font-bold">Visual Identity data is empty</div>
+        <div className="text-white/35 text-sm leading-relaxed max-w-md mx-auto">
+          The visual identity agent returned no data. Check that{' '}
+          <span className="text-amber-300/80">OPENAI_API_KEY</span> and{' '}
+          <span className="text-amber-300/80">GEMINI_API_KEY</span> are set in the backend{' '}
+          <code className="bg-white/10 px-1 rounded">.env</code> file.
+        </div>
+        {onRegenerate && (
+          <button
+            onClick={() => onRegenerate('visual_identity_agent', 'regenerate visual identity')}
+            className="mt-2 px-5 py-2 rounded-xl bg-white/5 border border-white/15 text-white/60 hover:text-white hover:bg-white/10 text-sm font-bold transition-all"
+          >
+            Retry
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-2xl font-black text-white uppercase tracking-tight">Brand Variants</h2>
+          <h2 className="text-2xl font-black text-white uppercase tracking-tight">Logo Concepts</h2>
           <p className="text-white/40 text-sm mt-1">
-            {localVariants.length} variants · {withWordmark} wordmark · {withLogomark} logomark · {withColorVers} color versions
+            10 distinct visual directions — researched & designed by Gemini + rendered by{' '}
+            {imageModel || 'OpenAI'}
           </p>
         </div>
         {onRegenerate && (
           <button
-            onClick={() => onRegenerate('visual_identity_agent', 'regenerate all brand variants with fresh creative directions')}
+            onClick={() => onRegenerate('visual_identity_agent', 'regenerate logo concepts with fresh visual directions')}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/70 hover:text-white transition-all text-sm font-semibold"
           >
-            Regenerate All
+            Regenerate
           </button>
         )}
       </div>
 
-      {/* Info callout */}
+      {/* How it works callout */}
       <div className="flex items-start gap-3 p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/15">
         <span className="text-indigo-400 text-lg flex-shrink-0">✦</span>
         <div className="text-xs text-white/45 leading-relaxed">
-          Each variant is built on a named visual archetype, includes a{' '}
-          <span className="text-indigo-300 font-bold">Wordmark prompt</span>,{' '}
-          <span className="text-emerald-300 font-bold">Logomark prompt</span>, and{' '}
-          <span className="text-amber-300 font-bold">3 color versions</span> (full-color, monochrome, dark-mode) —
-          all ready for <strong className="text-white/60">Ideogram AI</strong> or a human designer.
-          Click any variant to explore and copy.
+          <span className="text-indigo-300 font-bold">Gemini</span> researched your competitors online and generated a
+          brand-tailored 10-concept design brief. <span className="text-amber-300 font-bold">OpenAI</span> rendered the
+          visual grid. Use it as a reference for your designer or paste individual concept descriptions into Midjourney / Ideogram.
         </div>
       </div>
 
-      {/* Gallery grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4">
-        {localVariants.map((variant, realIndex) => (
-          <GalleryCard
-            key={realIndex}
-            variant={variant}
-            onClick={() => setSelected({ variant, index: realIndex })}
-          />
-        ))}
-      </div>
+      {/* Generated image */}
+      <GeneratedImagePanel
+        imageUrl={imageUrl}
+        imageModel={imageModel}
+        imageError={imageError}
+        imagePrompt={imagePrompt}
+        onRegenerate={onRegenerate}
+      />
 
-      {/* Modal */}
-      {selected && (
-        <VariantModal
-          variant={selected.variant}
-          variantIndex={selected.index}
-          projectId={projectId}
-          onClose={() => setSelected(null)}
-          onUpdated={handleVariantUpdated}
-        />
+      {/* Design tokens row */}
+      {(primaryColor || accentColor || font) && (
+        <div className="flex flex-wrap gap-3 items-center">
+          {primaryColor && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/8 bg-white/[0.02]">
+              <div className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: primaryColor }} />
+              <span className="text-[11px] font-mono text-white/50">{primaryColor}</span>
+              <span className="text-[10px] text-white/25">Primary</span>
+            </div>
+          )}
+          {accentColor && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/8 bg-white/[0.02]">
+              <div className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: accentColor }} />
+              <span className="text-[11px] font-mono text-white/50">{accentColor}</span>
+              <span className="text-[10px] text-white/25">Accent</span>
+            </div>
+          )}
+          {font && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/8 bg-white/[0.02]">
+              <span className="text-[11px] text-white/50">Aa</span>
+              <span className="text-[11px] text-white/50">{font}</span>
+            </div>
+          )}
+        </div>
       )}
+
+      {/* 10 Concept cards */}
+      {concepts.length > 0 && (
+        <div className="space-y-3">
+          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">
+            10 Visual Concepts
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {concepts.map((c) => (
+              <ConceptCard key={c.number} concept={c} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Design brief */}
+      <DesignBriefPanel
+        briefText={briefText}
+        competitorNotes={compNotes}
+        primaryColor={primaryColor}
+        accentColor={accentColor}
+        font={font}
+      />
     </div>
   );
 }
