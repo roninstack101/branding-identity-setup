@@ -1,98 +1,233 @@
 """
-Agent 6 – Visual Identity Intelligence Agent (v4)
+Agent 6 – Visual Identity Intelligence Agent (v5)
 
 Pipeline:
   1. Gemini (+ Google Search) — researches competitors, generates brand-tailored
-     10-concept logo design brief.
-  2. Gemini (no search, 10 parallel calls) — generates one downloadable SVG per concept.
+     10-concept logo design brief using the industry-standard template.
+  2. Python deterministic SVG renderer — builds pixel-perfect SVG for each archetype
+     using brand colours from the brief. No LLM SVG generation — always correct output.
   3. Inspiration links collected in parallel.
 
 Output data keys:
   design_concepts     – list of 10 dicts, each with "svg" field (self-contained SVG string)
   logo_design_brief   – full text brief from Gemini
   competitor_visual_notes
-  primary_color / accent_color / neutral_dark / font
+  primary_color / accent_color / neutral_dark / font / style_descriptors / symbol_concepts
   logo_inspiration    – curated designer reference links
 """
 import json
+import math
 import re
 from urllib.parse import quote_plus, urlparse
 
 from app.schemas.brand_schema import AgentResult
-from app.utils.gemini_search import call_gemini_with_search, call_gemini_for_svg
+from app.utils.gemini_search import call_gemini_with_search
 from app.utils.llm import call_llm
 from app.utils.search import web_search
 
 
-# ── Archetype → concrete SVG construction guide ───────────────────────────────
-_ARCHETYPE_SVG_GUIDE: dict[str, str] = {
-    "Interlocked Monogram": (
-        "Draw overlapping geometric letter shapes for the brand initials. "
-        "Use thin rectangles and diagonal strokes that interlock at precise angles to form a unified mark. "
-        "Stroke-width 3-5, primary color. Stroke only on letter shapes — no fill."
-    ),
-    "Ecosystem Orbit": (
-        "Central filled circle (r=38) in primary color at canvas center (200,155). "
-        "Surrounding orbit ring: circle cx='200' cy='155' r='85' stroke=primary stroke-width='3' fill='none'. "
-        "Three small filled circles (r=10) on the orbit ring at 0deg, 120deg, 240deg — one in accent color."
-    ),
-    "Growth Stack": (
-        "Five ascending vertical bars, bottom-aligned at y=255. "
-        "Heights: 70, 100, 130, 155, 185px. Width=28px, gap=12px, centered horizontally (leftmost bar starts at x=100). "
-        "First four bars: primary color. Fifth (tallest) bar: accent color."
-    ),
-    "Bridge Arc": (
-        "Wide arc: path d='M 80,215 Q 200,85 320,215' stroke=primary stroke-width='8' fill='none'. "
-        "Two vertical lines from arc endpoints down: (80,215)→(80,258) and (320,215)→(320,258). "
-        "Horizontal base line: (80,258)→(320,258). Small filled circles (r=8, accent) at both arc endpoints."
-    ),
-    "Tri-form Overlap": (
-        "Three circles (r=65), overlapping by ~25%, arranged in a triangle. "
-        "Centers: top (200,115), bottom-left (153,205), bottom-right (247,205). "
-        "Each circle: stroke only, no fill, stroke-width=4. "
-        "Colors: primary color, accent color, and a desaturated blend of both for the third."
-    ),
-    "Network Nodes": (
-        "Six small filled circles (r=10) at: (130,125), (200,95), (268,135), (148,205), (238,195), (194,160). "
-        "Connect them with thin lines (stroke-width=1.5, primary at 50% opacity). "
-        "Central node at (194,160): r=22, accent color. Five outer nodes: primary color."
-    ),
-    "Dynamic Sweep": (
-        "Bold upward-right sweep: path d='M 75,245 L 135,245 L 300,95 L 322,95 L 322,128 L 168,245 Z' fill=primary. "
-        "Accent punctuation dot: circle cx='311' cy='108' r='18' fill=accent."
-    ),
-    "Digital Grid": (
-        "Draw a 4x4 grid of squares (each 28x28px, gap=10px), top-left at (114,68). "
-        "Fill pattern (P=primary, A=accent, E=empty/stroke-only): "
-        "Row1: P A P E  Row2: A P E P  Row3: P E A P  Row4: E P P A. "
-        "Empty squares: stroke=primary stroke-width=1.5 fill=none."
-    ),
-    "Globe / Planet": (
-        "Globe circle: cx='200' cy='160' r='95' stroke=primary stroke-width='4' fill='none'. "
-        "Two latitude ellipses inside: "
-        "  ellipse cx='200' cy='140' rx='95' ry='22' stroke=primary stroke-width='2' fill='none'. "
-        "  ellipse cx='200' cy='182' rx='95' ry='22' stroke=primary stroke-width='2' fill='none'. "
-        "Orbital ring: ellipse cx='200' cy='160' rx='125' ry='28' stroke=accent stroke-width='3' fill='none' transform='rotate(-20 200 160)'."
-    ),
-    "Journey Swoosh + Dot": (
-        "Flowing curve: path d='M 68,268 C 98,198 198,145 312,98' stroke=primary stroke-width='7' fill='none' stroke-linecap='round'. "
-        "Destination dot: circle cx='312' cy='98' r='20' fill=accent. "
-        "Origin dot: circle cx='68' cy='268' r='10' fill=primary opacity='0.4'."
-    ),
-}
+# ── Deterministic SVG symbol builders (one per archetype) ─────────────────────
+# These always produce pixel-perfect, professional SVGs — no LLM involved.
+# Canvas: 400×400. Symbol area: x 60-340, y 30-270. Wordmark below y=283.
 
-_FALLBACK_GUIDE = "Create an abstract minimal geometric mark using circles, rectangles, and lines in the primary and accent colors, centered in the canvas."
+def _xe(s: str) -> str:
+    """XML-escape text for safe embedding in SVG."""
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
-# ── SVG system prompt ──────────────────────────────────────────────────────────
-_SVG_SYSTEM_PROMPT = """You are a professional SVG graphic designer creating minimal geometric logos.
-Return ONLY raw SVG markup — no explanation, no markdown fences, no other text.
 
-STRICT RULES:
-- Start with <svg and end with </svg>
-- Use ONLY: rect, circle, ellipse, path, polygon, line, polyline, text, g, defs, linearGradient, stop
-- NO JavaScript, NO external images, NO foreignObject, NO HTML, NO CSS @import
-- All attribute values must be quoted strings with explicit numeric values
-- Font: font-family="Arial, Helvetica, sans-serif" only"""
+def _sym_monogram(P: str, A: str, abbr: str) -> str:
+    """Two interlocked L-bracket forms creating a unified square-frame mark."""
+    L = _xe(abbr[0]) if abbr else "M"
+    return (
+        # Primary: top + left arms
+        f'<rect x="118" y="58" width="20" height="192" rx="4" fill="{P}"/>'
+        f'<rect x="118" y="58" width="118" height="20" rx="4" fill="{P}"/>'
+        # Accent: bottom + right arms
+        f'<rect x="262" y="58" width="20" height="192" rx="4" fill="{A}"/>'
+        f'<rect x="164" y="230" width="118" height="20" rx="4" fill="{A}"/>'
+        # Subtle centre crossbar (primary)
+        f'<rect x="118" y="148" width="164" height="12" rx="3" fill="{P}" opacity="0.18"/>'
+        # Ghost initial watermark
+        f'<text x="200" y="200" text-anchor="middle" dominant-baseline="middle"'
+        f' font-family="Arial,Helvetica,sans-serif" font-size="80" font-weight="900"'
+        f' fill="{P}" opacity="0.05">{L}</text>'
+    )
+
+
+def _sym_orbit(P: str, A: str) -> str:
+    """Central hub circle with orbit ring and three satellite nodes."""
+    cx, cy, ro = 200, 152, 90
+    # satellites at −90°(top), 210°(lower-left), 330°(lower-right)
+    s = [(cx + ro * math.cos(math.radians(a)), cy + ro * math.sin(math.radians(a)))
+         for a in (-90, 210, 330)]
+    return (
+        f'<circle cx="{cx}" cy="{cy}" r="{ro}" stroke="{P}" stroke-width="3" fill="none"/>'
+        f'<circle cx="{s[0][0]:.1f}" cy="{s[0][1]:.1f}" r="12" fill="{P}"/>'
+        f'<circle cx="{s[1][0]:.1f}" cy="{s[1][1]:.1f}" r="12" fill="{P}"/>'
+        f'<circle cx="{s[2][0]:.1f}" cy="{s[2][1]:.1f}" r="14" fill="{A}"/>'
+        f'<circle cx="{cx}" cy="{cy}" r="40" fill="{P}"/>'
+    )
+
+
+def _sym_growth(P: str, A: str) -> str:
+    """Five ascending bars — tallest in accent, rounded tops."""
+    base = 262
+    specs = [(108, 78, P), (148, 108, P), (188, 140, P), (228, 168, P), (268, 200, A)]
+    return "".join(
+        f'<rect x="{x}" y="{base - h}" width="28" height="{h}" rx="5" fill="{c}"/>'
+        for x, h, c in specs
+    )
+
+
+def _sym_bridge(P: str, A: str) -> str:
+    """Arch with two pylons, horizontal base, accent spring-point dots."""
+    return (
+        f'<path d="M 80,222 Q 200,60 320,222" stroke="{P}" stroke-width="9"'
+        f' fill="none" stroke-linecap="round"/>'
+        f'<rect x="71" y="222" width="18" height="40" rx="4" fill="{P}"/>'
+        f'<rect x="311" y="222" width="18" height="40" rx="4" fill="{P}"/>'
+        f'<rect x="62" y="258" width="276" height="12" rx="4" fill="{P}"/>'
+        f'<circle cx="80" cy="222" r="11" fill="{A}"/>'
+        f'<circle cx="320" cy="222" r="11" fill="{A}"/>'
+    )
+
+
+def _sym_triform(P: str, A: str) -> str:
+    """Three overlapping circles in equilateral triangle — stroke + subtle fill."""
+    return (
+        f'<circle cx="200" cy="88"  r="74" stroke="{P}" stroke-width="5"'
+        f' fill="{P}" fill-opacity="0.07"/>'
+        f'<circle cx="148" cy="190" r="74" stroke="{A}" stroke-width="5"'
+        f' fill="{A}" fill-opacity="0.07"/>'
+        f'<circle cx="252" cy="190" r="74" stroke="{P}" stroke-width="3"'
+        f' fill="{P}" fill-opacity="0.04" opacity="0.55"/>'
+    )
+
+
+def _sym_network(P: str, A: str) -> str:
+    """Hub-and-spoke network: central accent node + six outer primary nodes."""
+    cx, cy, ro = 200, 152, 88
+    outer = [(cx + ro * math.cos(math.radians(a)), cy + ro * math.sin(math.radians(a)))
+             for a in range(0, 360, 60)]
+    spokes = "".join(
+        f'<line x1="{cx}" y1="{cy}" x2="{ox:.1f}" y2="{oy:.1f}"'
+        f' stroke="{P}" stroke-width="2" opacity="0.35"/>'
+        for ox, oy in outer
+    )
+    # Adjacent cross-links (every other pair)
+    links = "".join(
+        f'<line x1="{outer[i][0]:.1f}" y1="{outer[i][1]:.1f}"'
+        f' x2="{outer[(i+2)%6][0]:.1f}" y2="{outer[(i+2)%6][1]:.1f}"'
+        f' stroke="{P}" stroke-width="1" opacity="0.18"/>'
+        for i in range(0, 6, 2)
+    )
+    nodes = "".join(
+        f'<circle cx="{ox:.1f}" cy="{oy:.1f}" r="10" fill="{P}"/>'
+        for ox, oy in outer
+    )
+    hub = f'<circle cx="{cx}" cy="{cy}" r="24" fill="{A}"/>'
+    return spokes + links + nodes + hub
+
+
+def _sym_sweep(P: str, A: str) -> str:
+    """Bold diagonal slash parallelogram with accent punctuation circle."""
+    return (
+        f'<path d="M 72,252 L 150,252 L 328,70 L 328,103 L 178,252 Z" fill="{P}"/>'
+        f'<circle cx="317" cy="86" r="21" fill="{A}"/>'
+    )
+
+
+def _sym_grid(P: str, A: str) -> str:
+    """4×4 pixel grid with a distinctive primary/accent colour pattern."""
+    sq, gap, sx, sy = 28, 10, 129, 82
+    pattern = [
+        [P,    None, P,    A   ],
+        [None, P,    A,    None],
+        [A,    None, P,    P   ],
+        [P,    A,    None, P   ],
+    ]
+    out = ""
+    for ri, row in enumerate(pattern):
+        for ci, col in enumerate(row):
+            x = sx + ci * (sq + gap)
+            y = sy + ri * (sq + gap)
+            if col:
+                out += f'<rect x="{x}" y="{y}" width="{sq}" height="{sq}" rx="5" fill="{col}"/>'
+            else:
+                out += (
+                    f'<rect x="{x}" y="{y}" width="{sq}" height="{sq}" rx="5"'
+                    f' stroke="{P}" stroke-width="1.5" fill="none" opacity="0.22"/>'
+                )
+    return out
+
+
+def _sym_globe(P: str, A: str) -> str:
+    """Globe outline with latitude lines (clipPath) and accent orbital ring."""
+    return (
+        '<defs><clipPath id="gc"><circle cx="200" cy="148" r="98"/></clipPath></defs>'
+        f'<circle cx="200" cy="148" r="100" stroke="{P}" stroke-width="3.5" fill="none"/>'
+        f'<g clip-path="url(#gc)">'
+        f'<line x1="60" y1="115" x2="340" y2="115" stroke="{P}" stroke-width="1.5" opacity="0.45"/>'
+        f'<line x1="60" y1="148" x2="340" y2="148" stroke="{P}" stroke-width="1.5" opacity="0.45"/>'
+        f'<line x1="60" y1="181" x2="340" y2="181" stroke="{P}" stroke-width="1.5" opacity="0.45"/>'
+        f'<line x1="200" y1="48"  x2="200" y2="248" stroke="{P}" stroke-width="1.5" opacity="0.45"/>'
+        '</g>'
+        f'<ellipse cx="200" cy="148" rx="132" ry="32" stroke="{A}" stroke-width="3.5"'
+        f' fill="none" transform="rotate(-22 200 148)"/>'
+        f'<circle cx="272" cy="116" r="9" fill="{A}"/>'
+    )
+
+
+def _sym_swoosh(P: str, A: str) -> str:
+    """Smooth bezier swoosh from origin to destination, with accent dot."""
+    return (
+        f'<path d="M 68,268 C 92,202 188,148 318,95"'
+        f' stroke="{P}" stroke-width="8" fill="none" stroke-linecap="round"/>'
+        f'<circle cx="318" cy="95"  r="23" fill="{A}"/>'
+        f'<circle cx="68"  cy="268" r="11" fill="{P}" opacity="0.4"/>'
+    )
+
+
+# ── Archetype dispatcher ───────────────────────────────────────────────────────
+def _build_deterministic_svg(
+    approach: str,
+    brand_name: str,
+    abbreviation: str,
+    concept_num: int,
+    concept_name: str,
+    primary: str,
+    accent: str,
+) -> str:
+    al = approach.lower()
+    if   "monogram" in al:                         sym = _sym_monogram(primary, accent, abbreviation)
+    elif "orbit"    in al or "ecosystem"  in al:   sym = _sym_orbit(primary, accent)
+    elif "stack"    in al or "growth"     in al:   sym = _sym_growth(primary, accent)
+    elif "arc"      in al or "bridge"     in al:   sym = _sym_bridge(primary, accent)
+    elif "overlap"  in al or "tri"        in al:   sym = _sym_triform(primary, accent)
+    elif "node"     in al or "network"    in al:   sym = _sym_network(primary, accent)
+    elif "sweep"    in al or "dynamic"    in al:   sym = _sym_sweep(primary, accent)
+    elif "grid"     in al or "digital"    in al:   sym = _sym_grid(primary, accent)
+    elif "globe"    in al or "planet"     in al:   sym = _sym_globe(primary, accent)
+    elif "journey"  in al or "swoosh"     in al:   sym = _sym_swoosh(primary, accent)
+    else:                                           sym = _sym_orbit(primary, accent)
+
+    bn = _xe(brand_name)
+    ab = _xe(abbreviation)
+    cn = _xe(concept_name).upper()
+
+    return (
+        f'<svg viewBox="0 0 400 400" width="400" height="400" xmlns="http://www.w3.org/2000/svg">'
+        f'<rect width="400" height="400" fill="white"/>'
+        f'{sym}'
+        f'<line x1="60" y1="283" x2="340" y2="283" stroke="#e5e7eb" stroke-width="1"/>'
+        f'<text x="200" y="316" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"'
+        f' font-size="26" font-weight="700" fill="{primary}">{bn}</text>'
+        f'<text x="200" y="346" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"'
+        f' font-size="11" font-weight="600" letter-spacing="5" fill="{accent}">{ab}</text>'
+        f'<text x="200" y="383" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"'
+        f' font-size="9" fill="#9ca3af">{concept_num}. {cn}</text>'
+        f'</svg>'
+    )
 
 # ── Gemini brief system prompt ─────────────────────────────────────────────────
 GEMINI_BRIEF_SYSTEM = """You are a world-class brand identity director at a top-tier creative agency (Pentagram / Landor / Wolff Olins level).
@@ -324,98 +459,32 @@ async def _collect_inspiration_links(industry: str, concepts: list[dict]) -> lis
     return all_links[:30]
 
 
-# ── SVG generation (10 parallel Gemini calls) ──────────────────────────────────
-async def _generate_concept_svgs(
+# ── SVG generation — deterministic, no LLM ────────────────────────────────────
+def _generate_concept_svgs(
     brand_name: str,
     abbreviation: str,
-    tagline: str,
     concepts: list[dict],
     primary_color: str,
     accent_color: str,
 ) -> list[dict]:
-    def _placeholder(number: int, name: str) -> str:
-        return (
-            f'<svg viewBox="0 0 400 400" width="400" height="400" xmlns="http://www.w3.org/2000/svg">'
-            f'<rect width="400" height="400" fill="white"/>'
-            f'<rect x="170" y="150" width="60" height="60" rx="6" fill="{primary_color}" opacity="0.12"/>'
-            f'<text x="200" y="188" text-anchor="middle" font-family="Arial,sans-serif" font-size="11" fill="{primary_color}" opacity="0.35">SVG pending</text>'
-            f'<line x1="60" y1="285" x2="340" y2="285" stroke="#e5e7eb" stroke-width="1"/>'
-            f'<text x="200" y="318" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="26" font-weight="700" fill="{primary_color}">{brand_name}</text>'
-            f'<text x="200" y="348" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="11" letter-spacing="5" fill="{accent_color}">{abbreviation}</text>'
-            f'<text x="200" y="385" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="9" fill="#9ca3af">{number}. {name.upper()}</text>'
-            f'</svg>'
-        )
-
-    async def _generate_one(concept: dict) -> dict:
-        approach = concept.get("approach", "")
-
-        # Find matching archetype guide
-        guide_raw = _FALLBACK_GUIDE
-        for key, val in _ARCHETYPE_SVG_GUIDE.items():
-            key_root = key.lower().split("/")[0].strip()
-            if key_root in approach.lower():
-                guide_raw = val
-                break
-
-        # Use concept-level palette if provided, otherwise fall back to global
-        concept_palette = concept.get("palette", [])
-        c_primary = concept_palette[0] if concept_palette else primary_color
-        c_accent  = concept_palette[1] if len(concept_palette) > 1 else accent_color
-
-        # Re-apply color substitutions with concept-level palette
-        guide = (
-            guide_raw
-            .replace("{primary}", c_primary)
-            .replace("{accent}", c_accent)
-            .replace("primary color", c_primary)
-            .replace("accent color", c_accent)
-        )
-
-        direction_note = concept.get("direction", "")
-        typo_note = concept.get("typography", "Arial, Helvetica, sans-serif")
-
-        prompt = (
-            f"{_SVG_SYSTEM_PROMPT}\n\n"
-            f"Brand: {brand_name} | Abbreviation: {abbreviation} | Tagline: {tagline}\n"
-            f"Concept {concept['number']}: {concept['name']} — {approach}\n"
-            f"Design Direction: {direction_note}\n"
-            f"Rationale: {concept.get('rationale', '')}\n"
-            f"Primary color: {c_primary} | Accent color: {c_accent}\n"
-            f"Typography: {typo_note}\n\n"
-            f"SYMBOL CONSTRUCTION (follow precisely):\n{guide}\n\n"
-            f"SVG SPEC: viewBox=\"0 0 400 400\" width=\"400\" height=\"400\" xmlns=\"http://www.w3.org/2000/svg\"\n\n"
-            f"REQUIRED STRUCTURE:\n"
-            f'1. <rect width="400" height="400" fill="white"/>\n'
-            f"2. Draw the symbol mark centered in the area x:60-340, y:30-270 using the construction guide above\n"
-            f'3. <line x1="60" y1="283" x2="340" y2="283" stroke="#e5e7eb" stroke-width="1"/>\n'
-            f'4. <text x="200" y="316" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" '
-            f'font-size="26" font-weight="700" fill="{c_primary}">{brand_name}</text>\n'
-            f'5. <text x="200" y="346" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" '
-            f'font-size="11" font-weight="600" letter-spacing="5" fill="{c_accent}">{abbreviation}</text>\n'
-            f'6. <text x="200" y="383" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" '
-            f'font-size="9" fill="#9ca3af">{concept["number"]}. {concept["name"].upper()}</text>\n\n'
-            f"Return ONLY the complete SVG. No text before or after."
-        )
-
-        svg = await call_gemini_for_svg(prompt)
-        if not svg:
-            print(f"[visual_identity_agent] SVG empty for concept {concept['number']} — using placeholder")
-            svg = _placeholder(concept["number"], concept["name"])
-
-        return {**concept, "svg": svg}
-
+    """Build one pixel-perfect SVG per concept using the deterministic template system."""
     final: list[dict] = []
-    for i, concept in enumerate(concepts):
-        print(f"[visual_identity_agent] Generating SVG {i + 1}/{len(concepts)}: {concept.get('name', '')}")
-        try:
-            result = await _generate_one(concept)
-            final.append(result)
-        except Exception as exc:
-            print(f"[visual_identity_agent] Concept {i + 1} exception: {exc}")
-            final.append({**concept, "svg": _placeholder(concept["number"], concept["name"])})
+    for concept in concepts:
+        palette   = concept.get("palette", [])
+        c_primary = palette[0] if palette else primary_color
+        c_accent  = palette[1] if len(palette) > 1 else accent_color
+        svg = _build_deterministic_svg(
+            approach     = concept.get("approach", ""),
+            brand_name   = brand_name,
+            abbreviation = abbreviation,
+            concept_num  = concept.get("number", 0),
+            concept_name = concept.get("name", ""),
+            primary      = c_primary,
+            accent       = c_accent,
+        )
+        final.append({**concept, "svg": svg})
 
-    svg_ok = sum(1 for r in final if r.get("svg") and "SVG pending" not in r["svg"])
-    print(f"[visual_identity_agent] SVGs: {svg_ok}/{len(final)} generated successfully")
+    print(f"[visual_identity_agent] Built {len(final)} deterministic SVGs")
     return final
 
 
@@ -549,12 +618,12 @@ async def run(
 
     print(f"[visual_identity_agent] Brief done — {len(concepts)} concepts, colors: {primary_color} / {accent_color}")
 
-    # ── Step 2: Generate SVG per concept (parallel) ───────────────────────────
+    # ── Step 2: Build deterministic SVGs (pure Python, instant) ─────────────
     concepts_with_svg: list[dict] = []
     if concepts:
-        print(f"[visual_identity_agent] Step 2 — generating {len(concepts)} SVGs in parallel")
-        concepts_with_svg = await _generate_concept_svgs(
-            brand_name, abbreviation, tagline, concepts, primary_color, accent_color
+        print(f"[visual_identity_agent] Step 2 — building {len(concepts)} deterministic SVGs")
+        concepts_with_svg = _generate_concept_svgs(
+            brand_name, abbreviation, concepts, primary_color, accent_color
         )
     else:
         print("[visual_identity_agent] No concepts — skipping SVG generation")
