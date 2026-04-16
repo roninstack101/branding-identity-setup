@@ -188,185 +188,98 @@ def _sym_swoosh(P: str, A: str) -> str:
     )
 
 
-# ── Archetype dispatcher ───────────────────────────────────────────────────────
-def _build_deterministic_svg(
-    approach: str,
+# ── Fallback: rotate through geometric templates by concept index ─────────────
+_FALLBACK_BUILDERS = [
+    lambda P, A, ab: _sym_monogram(P, A, ab),  # monogram uses abbreviation
+    lambda P, A, _:  _sym_orbit(P, A),
+    lambda P, A, _:  _sym_growth(P, A),
+    lambda P, A, _:  _sym_bridge(P, A),
+    lambda P, A, _:  _sym_triform(P, A),
+    lambda P, A, _:  _sym_network(P, A),
+    lambda P, A, _:  _sym_sweep(P, A),
+    lambda P, A, _:  _sym_grid(P, A),
+    lambda P, A, _:  _sym_globe(P, A),
+    lambda P, A, _:  _sym_swoosh(P, A),
+]
+
+
+def _build_fallback_svg(
+    concept_num: int,
     brand_name: str,
     abbreviation: str,
-    concept_num: int,
     concept_name: str,
     primary: str,
     accent: str,
 ) -> str:
-    al = approach.lower()
-    if   "monogram" in al:                         sym = _sym_monogram(primary, accent, abbreviation)
-    elif "orbit"    in al or "ecosystem"  in al:   sym = _sym_orbit(primary, accent)
-    elif "stack"    in al or "growth"     in al:   sym = _sym_growth(primary, accent)
-    elif "arc"      in al or "bridge"     in al:   sym = _sym_bridge(primary, accent)
-    elif "overlap"  in al or "tri"        in al:   sym = _sym_triform(primary, accent)
-    elif "node"     in al or "network"    in al:   sym = _sym_network(primary, accent)
-    elif "sweep"    in al or "dynamic"    in al:   sym = _sym_sweep(primary, accent)
-    elif "grid"     in al or "digital"    in al:   sym = _sym_grid(primary, accent)
-    elif "globe"    in al or "planet"     in al:   sym = _sym_globe(primary, accent)
-    elif "journey"  in al or "swoosh"     in al:   sym = _sym_swoosh(primary, accent)
-    else:                                           sym = _sym_orbit(primary, accent)
-
-    bn = _xe(brand_name)
-    ab = _xe(abbreviation)
-    cn = _xe(concept_name).upper()
-
-    return (
-        f'<svg viewBox="0 0 400 400" width="400" height="400" xmlns="http://www.w3.org/2000/svg">'
-        f'<rect width="400" height="400" fill="white"/>'
-        f'{sym}'
-        f'<line x1="60" y1="283" x2="340" y2="283" stroke="#e5e7eb" stroke-width="1"/>'
-        f'<text x="200" y="316" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"'
-        f' font-size="26" font-weight="700" fill="{primary}">{bn}</text>'
-        f'<text x="200" y="346" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"'
-        f' font-size="11" font-weight="600" letter-spacing="5" fill="{accent}">{ab}</text>'
-        f'<text x="200" y="383" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"'
-        f' font-size="9" fill="#9ca3af">{concept_num}. {cn}</text>'
-        f'</svg>'
-    )
+    """Fallback SVG when GPT-4o fails — picks a distinct geometric mark by concept index."""
+    builder = _FALLBACK_BUILDERS[(concept_num - 1) % len(_FALLBACK_BUILDERS)]
+    sym = builder(primary, accent, abbreviation)
+    wm  = _wordmark(brand_name, abbreviation, concept_num, concept_name, primary, accent)
+    return _wrap_svg(sym, wm)
 
 # ── Gemini brief system prompt ─────────────────────────────────────────────────
-GEMINI_BRIEF_SYSTEM = """You are a world-class brand identity director at a top-tier creative agency (Pentagram / Landor / Wolff Olins level).
+GEMINI_BRIEF_SYSTEM = """You are a world-class brand identity director at Pentagram / Landor / Wolff Olins level.
 
 Use Google Search to:
-1. Research the brand's top 3-5 direct competitors — find their actual logo styles, colours, fonts, visual identity
-2. Find 2024-2025 logo/brand design trends specific to this industry
-3. Identify unclaimed visual territory — directions no competitor has taken yet
+1. Research the brand's top 3-5 direct competitors — logo styles, colours, fonts, visual identity
+2. Find 2024-2025 logo design trends specific to this industry
+3. Identify unclaimed visual territory no competitor has taken yet
 
-Generate a comprehensive 10-concept logo design brief using the industry-standard template below.
-Return ONLY valid JSON (no markdown fences, no text outside the JSON):
+Generate 10 COMPLETELY ORIGINAL logo concepts specific to this brand.
+DO NOT use generic archetype names. Invent unique visual ideas rooted in this brand's story, values, and market.
+Each concept must be visually distinct from the others.
+
+Return ONLY valid JSON (no markdown, no text outside JSON):
 
 {
-  "brief_text": "Full formatted design brief (1200+ words) structured as follows:
-
+  "brief_text": "Full design brief (1200+ words):
 ━━━ BRAND OVERVIEW ━━━
-Full company name (abbreviation). Industry / sector. Core business description — what it does, key divisions/products/services, geographic focus. Brand essence / tagline. Values (list). Primary audience, secondary audience, tertiary audience.
-
+Company name (abbreviation), industry, core business, brand essence/tagline, values, audiences.
 ━━━ DESIGN REQUIREMENTS ━━━
-Symbol + wordmark logo system. Style descriptors. Symbol must abstractly express (5-7 keywords from brand essence, values, business model). Typography direction. Colour palette with primary (name + hex range), accent options, neutrals. 2024-25 design trends applied. Must work at: favicon, app icon, signage, digital UI, print, merchandise. Deliver 3 versions per concept: 1. Full-colour  2. Monochrome (black/white)  3. Inverted on dark background.
-
-━━━ COMPETITOR VISUAL LANDSCAPE ━━━
-(FROM LIVE SEARCH) Real competitor names, their logo styles, dominant colours, typography choices. Visual territory already occupied. Unclaimed visual space this brand can own.
-
-━━━ 2024-25 INDUSTRY DESIGN TRENDS ━━━
-(FROM LIVE SEARCH) Specific current trends relevant to this industry. Flat/minimal geometry, subtle gradients, responsive icon systems, monogram-friendly variants, plus industry-specific trend.
-
-━━━ 10 LOGO CONCEPT DIRECTIONS ━━━
-For each: concept number, visual approach name, brand-specific description of the direction, one-line rationale, typography, palette.",
+Symbol + wordmark system. Style. 5-7 keywords symbols must express. Typography direction.
+Colour palette (primary + accent + neutrals). 2024-25 trends. Works at: favicon, app icon, signage, digital, print, merch.
+3 versions per concept: full-colour, monochrome, dark-inverted.
+━━━ COMPETITOR VISUAL LANDSCAPE ━━━ (FROM LIVE SEARCH)
+Real competitor names, logo styles, colours, fonts. Occupied visual territory. Unclaimed space.
+━━━ 2024-25 INDUSTRY DESIGN TRENDS ━━━ (FROM LIVE SEARCH)
+Specific current trends for this industry.
+━━━ 10 LOGO CONCEPTS ━━━
+Each with: concept name, precise visual description, rationale, typography, palette.",
 
   "concepts": [
     {
       "number": 1,
-      "name": "short memorable name",
-      "approach": "Interlocked Monogram",
-      "direction": "Brand-specific: describe which letters interlock and what the combined form symbolises for this brand",
-      "rationale": "One-line creative rationale — why this direction fits this brand specifically",
-      "typography": "Google Font name",
-      "palette": ["#primary", "#accent", "#neutral"]
+      "name": "Short memorable concept title",
+      "visual_concept": "Precise visual description (4-6 sentences): what exact shapes to draw, their positions and proportions, how they relate to each other, what brand metaphor or story they express. Be specific — a designer must be able to execute this without any ambiguity. Example: Two thin curved lines rising from a shared base point, diverging outward like wings or a valley opening up, primary colour on the left curve, accent on the right. A small filled circle sits at the convergence point representing the origin. Together they suggest growth, duality, and upward momentum.",
+      "rationale": "One sentence: why this specific visual idea represents this brand",
+      "typography": "Specific Google Font name",
+      "palette": ["#hex_primary", "#hex_accent", "#hex_neutral"]
     },
-    {
-      "number": 2,
-      "name": "short memorable name",
-      "approach": "Ecosystem Orbit",
-      "direction": "Brand-specific: what central concept is the hub, what orbits it, what does it express about the business",
-      "rationale": "one sentence",
-      "typography": "Google Font name",
-      "palette": ["#primary", "#accent", "#neutral"]
-    },
-    {
-      "number": 3,
-      "name": "short memorable name",
-      "approach": "Growth Stack",
-      "direction": "Brand-specific: what does the ascending stack represent — divisions, milestones, market growth",
-      "rationale": "one sentence",
-      "typography": "Google Font name",
-      "palette": ["#primary", "#accent", "#neutral"]
-    },
-    {
-      "number": 4,
-      "name": "short memorable name",
-      "approach": "Bridge Arc",
-      "direction": "Brand-specific: what two entities / stakeholders / concepts does the arc connect",
-      "rationale": "one sentence",
-      "typography": "Google Font name",
-      "palette": ["#primary", "#accent", "#neutral"]
-    },
-    {
-      "number": 5,
-      "name": "short memorable name",
-      "approach": "Tri-form Overlap",
-      "direction": "Brand-specific: what three pillars / divisions / audiences do the three forms represent",
-      "rationale": "one sentence",
-      "typography": "Google Font name",
-      "palette": ["#primary", "#accent", "#neutral"]
-    },
-    {
-      "number": 6,
-      "name": "short memorable name",
-      "approach": "Network Nodes",
-      "direction": "Brand-specific: what does the network represent — partners, markets, service touchpoints",
-      "rationale": "one sentence",
-      "typography": "Google Font name",
-      "palette": ["#primary", "#accent", "#neutral"]
-    },
-    {
-      "number": 7,
-      "name": "short memorable name",
-      "approach": "Dynamic Sweep",
-      "direction": "Brand-specific: what does the bold motion express — speed, momentum, transformation",
-      "rationale": "one sentence",
-      "typography": "Google Font name",
-      "palette": ["#primary", "#accent", "#neutral"]
-    },
-    {
-      "number": 8,
-      "name": "short memorable name",
-      "approach": "Digital Grid",
-      "direction": "Brand-specific: how does the structured grid reflect the brand's precision, technology, or system",
-      "rationale": "one sentence",
-      "typography": "Google Font name",
-      "palette": ["#primary", "#accent", "#neutral"]
-    },
-    {
-      "number": 9,
-      "name": "short memorable name",
-      "approach": "Globe / Planet",
-      "direction": "Brand-specific: what global or expansive concept does this express — reach, scale, ambition",
-      "rationale": "one sentence",
-      "typography": "Google Font name",
-      "palette": ["#primary", "#accent", "#neutral"]
-    },
-    {
-      "number": 10,
-      "name": "short memorable name",
-      "approach": "Journey Swoosh + Dot",
-      "direction": "Brand-specific: what journey or transformation does the curve represent — origin to destination",
-      "rationale": "one sentence",
-      "typography": "Google Font name",
-      "palette": ["#primary", "#accent", "#neutral"]
-    }
+    ... 9 more, all visually distinct, all rooted in this brand's identity
   ],
 
   "primary_color": "#hex",
   "accent_color": "#hex",
-  "neutral_dark": "#1A1A2E",
-  "font": "primary Google Font for the brand wordmark",
-  "style_descriptors": "modern, geometric, minimal, premium — add 2-3 brand-specific style words",
-  "symbol_concepts": "5-7 keywords the symbol abstractly expresses (derived from brand essence + values)",
-  "competitor_visual_notes": "3-4 sentences from live search: competitor names + visual styles + unclaimed territory"
+  "neutral_dark": "#hex",
+  "font": "primary Google Font for wordmark",
+  "style_descriptors": "3-5 style keywords specific to this brand",
+  "symbol_concepts": "5-7 keywords the symbols abstractly express",
+  "competitor_visual_notes": "3-4 sentences: competitor names + visual styles (from search) + unclaimed visual territory"
 }
 
-Keep exact approach names. Return ONLY valid JSON."""
+Rules:
+- visual_concept is the most important field — make it rich, specific, drawable
+- 10 concepts must cover a genuine range: letterform/monogram, metaphor/icon, abstract geometry,
+  motion/energy, structural, organic, systematic, orbital, networked, journey — but expressed
+  as original ideas for THIS brand, not as generic templates
+- Each concept gets its own palette (derived from the global palette with variations)
+- Return ONLY valid JSON"""
 
 _FALLBACK_BRIEF_SYSTEM = (
-    "You are a brand identity director. Generate a 10-concept logo design brief following the industry-standard template. "
-    "Return ONLY valid JSON with keys: brief_text (structured with sections: BRAND OVERVIEW, DESIGN REQUIREMENTS, "
-    "COMPETITOR VISUAL LANDSCAPE, 2024-25 TRENDS, 10 LOGO CONCEPT DIRECTIONS), "
-    "concepts (array of 10 each with: number, name, approach, direction, rationale, typography, palette), "
+    "You are a brand identity director. Generate 10 completely original logo concepts for this brand. "
+    "Do NOT use generic archetype names — invent unique visual ideas rooted in the brand's story. "
+    "Return ONLY valid JSON with keys: brief_text, "
+    "concepts (array of 10, each with: number, name, visual_concept, rationale, typography, palette), "
     "primary_color, accent_color, neutral_dark, font, style_descriptors, symbol_concepts, competitor_visual_notes."
 )
 
@@ -413,9 +326,9 @@ async def _collect_inspiration_links(industry: str, concepts: list[dict]) -> lis
     _plan("Pinterest",        f"site:pinterest.com {industry} logo brand identity inspiration", "Visual mood boards", "Moodboard")
 
     for c in concepts[:3]:
-        approach = c.get("approach", "").split("/")[0].strip()
-        if approach:
-            _plan(f"Dribbble – {approach}", f"site:dribbble.com {approach} logo {industry}", f"Shots for {approach}", "Design Shots")
+        concept_name = c.get("name", "").split("/")[0].strip()
+        if concept_name:
+            _plan(f"Dribbble – {concept_name}", f"site:dribbble.com {concept_name} logo {industry}", f"Shots for {concept_name}", "Design Shots")
 
     async def _fetch(p: dict) -> list[dict]:
         results = await web_search(p["query"], num_results=4)
@@ -477,16 +390,15 @@ Return nothing except the raw SVG element(s). No explanation, no markdown."""
 _SYMBOL_USER_TMPL = """\
 Brand: {brand} ({abbr})
 Tagline: "{tagline}"
-Visual approach: {approach}
-Concept name: {name}
-Design direction: {direction}
+Concept: {name}
+Visual concept: {visual_concept}
 Creative rationale: {rationale}
 Primary colour: {primary}
 Accent colour: {accent}
 
-Draw a {approach} logo symbol for {brand} using the design direction above.
-Express the brand's identity through minimal geometric shapes.
-Primary colour {primary} for the main shapes. Accent colour {accent} for highlights."""
+Translate the visual concept above into SVG elements for {brand}.
+Express the described shapes and metaphor through minimal, geometric forms.
+Primary colour {primary} for main forms. Accent colour {accent} for highlights."""
 
 
 def _extract_svg_elements(raw: str) -> str:
@@ -560,13 +472,12 @@ async def _generate_concept_svgs(
         c_primary = palette[0] if palette else primary_color
         c_accent  = palette[1] if len(palette) > 1 else accent_color
 
-        num  = concept.get("number", i + 1)
-        name = concept.get("name", "")
-        approach   = concept.get("approach", "")
-        direction  = concept.get("direction", approach)
-        rationale  = concept.get("rationale", "")
+        num           = concept.get("number", i + 1)
+        name          = concept.get("name", "")
+        visual_concept = concept.get("visual_concept", "")
+        rationale     = concept.get("rationale", "")
 
-        print(f"[visual_identity_agent] SVG {i+1}/{len(concepts)}: {name} ({approach})")
+        print(f"[visual_identity_agent] SVG {i+1}/{len(concepts)}: {name}")
 
         wm  = _wordmark(brand_name, abbreviation, num, name, c_primary, c_accent)
         sym = ""
@@ -575,8 +486,8 @@ async def _generate_concept_svgs(
         try:
             user_prompt = _SYMBOL_USER_TMPL.format(
                 brand=brand_name, abbr=abbreviation, tagline=tagline,
-                approach=approach, name=name,
-                direction=direction, rationale=rationale,
+                visual_concept=visual_concept, name=name,
+                rationale=rationale,
                 primary=c_primary, accent=c_accent,
             )
             raw = await call_openai(
@@ -591,12 +502,12 @@ async def _generate_concept_svgs(
         except Exception as exc:
             print(f"[visual_identity_agent] GPT-4o failed for concept {num}: {exc}")
 
-        # ── Fallback: deterministic geometric template ────────────────────────
+        # ── Fallback: geometric template (concept-index based) ───────────────
         if not sym or len(sym) < 40:
-            print(f"[visual_identity_agent] Using deterministic fallback for concept {num}")
-            fallback_svg = _build_deterministic_svg(
-                approach=approach, brand_name=brand_name, abbreviation=abbreviation,
-                concept_num=num, concept_name=name, primary=c_primary, accent=c_accent,
+            print(f"[visual_identity_agent] Using geometric fallback for concept {num}")
+            fallback_svg = _build_fallback_svg(
+                concept_num=num, brand_name=brand_name, abbreviation=abbreviation,
+                concept_name=name, primary=c_primary, accent=c_accent,
             )
             final.append({**concept, "svg": fallback_svg})
             continue

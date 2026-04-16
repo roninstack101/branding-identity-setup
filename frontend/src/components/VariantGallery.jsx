@@ -1,26 +1,29 @@
 import { useState, useRef, useEffect } from 'react';
 
-// ── Archetype accent colors ───────────────────────────────────────────────────
-const ARCHETYPE_MAP = [
-  ['Interlocked Monogram', '#818cf8', 'rgba(129,140,248,0.22)', 'rgba(129,140,248,0.08)'],
-  ['Ecosystem Orbit',      '#34d399', 'rgba(52,211,153,0.22)',  'rgba(52,211,153,0.08)' ],
-  ['Growth Stack',         '#60a5fa', 'rgba(96,165,250,0.22)',  'rgba(96,165,250,0.08)' ],
-  ['Bridge Arc',           '#fbbf24', 'rgba(251,191,36,0.22)',  'rgba(251,191,36,0.08)' ],
-  ['Tri-form Overlap',     '#c084fc', 'rgba(192,132,252,0.22)', 'rgba(192,132,252,0.08)'],
-  ['Network Nodes',        '#38bdf8', 'rgba(56,189,248,0.22)',  'rgba(56,189,248,0.08)' ],
-  ['Dynamic Sweep',        '#fb923c', 'rgba(251,146,60,0.22)',  'rgba(251,146,60,0.08)' ],
-  ['Digital Grid',         '#a3e635', 'rgba(163,230,53,0.22)',  'rgba(163,230,53,0.08)' ],
-  ['Globe',                '#2dd4bf', 'rgba(45,212,191,0.22)',  'rgba(45,212,191,0.08)' ],
-  ['Journey Swoosh',       '#f472b6', 'rgba(244,114,182,0.22)', 'rgba(244,114,182,0.08)'],
+// ── Per-concept accent colors (index-based, no fixed archetype names) ─────────
+const CONCEPT_COLORS = [
+  ['#818cf8', 'rgba(129,140,248,0.22)', 'rgba(129,140,248,0.08)'],
+  ['#34d399', 'rgba(52,211,153,0.22)',  'rgba(52,211,153,0.08)' ],
+  ['#60a5fa', 'rgba(96,165,250,0.22)',  'rgba(96,165,250,0.08)' ],
+  ['#fbbf24', 'rgba(251,191,36,0.22)',  'rgba(251,191,36,0.08)' ],
+  ['#c084fc', 'rgba(192,132,252,0.22)', 'rgba(192,132,252,0.08)'],
+  ['#38bdf8', 'rgba(56,189,248,0.22)',  'rgba(56,189,248,0.08)' ],
+  ['#fb923c', 'rgba(251,146,60,0.22)',  'rgba(251,146,60,0.08)' ],
+  ['#a3e635', 'rgba(163,230,53,0.22)',  'rgba(163,230,53,0.08)' ],
+  ['#2dd4bf', 'rgba(45,212,191,0.22)',  'rgba(45,212,191,0.08)' ],
+  ['#f472b6', 'rgba(244,114,182,0.22)', 'rgba(244,114,182,0.08)'],
 ];
 
-function getArchStyle(approach = '') {
-  const lower = approach.toLowerCase();
-  for (const [key, color, border, bg] of ARCHETYPE_MAP) {
-    if (lower.includes(key.toLowerCase().split('/')[0].trim())) return { color, border, bg };
-  }
-  return { color: '#94a3b8', border: 'rgba(148,163,184,0.2)', bg: 'rgba(148,163,184,0.06)' };
+function getConceptStyle(number = 1) {
+  const [color, border, bg] = CONCEPT_COLORS[(number - 1) % CONCEPT_COLORS.length];
+  return { color, border, bg };
 }
+
+// Generic design style directions (not tied to fixed archetypes)
+const DESIGN_DIRECTIONS = [
+  'Minimal', 'Geometric', 'Bold', 'Typographic', 'Organic',
+  'Dynamic', 'Systematic', 'Monogram', 'Iconic', 'Abstract',
+];
 
 // ── Color helpers (for palette generator) ────────────────────────────────────
 function hslToHex(h, s, l) {
@@ -97,7 +100,7 @@ function downloadSVG(svg, filename) {
 
 // ── SVG Concept Card ──────────────────────────────────────────────────────────
 function ConceptCard({ concept, onClick }) {
-  const style    = getArchStyle(concept.approach || '');
+  const style    = getConceptStyle(concept.number || 1);
   const hasSVG   = Boolean(concept.svg) && !concept.svg.includes('SVG pending');
   const filename = `concept-${concept.number}-${(concept.name || '').toLowerCase().replace(/\s+/g, '-')}.svg`;
 
@@ -133,7 +136,9 @@ function ConceptCard({ concept, onClick }) {
             <div className="text-sm font-black leading-tight truncate" style={{ color: style.color }}>
               {concept.number}. {concept.name}
             </div>
-            <div className="text-[10px] text-white/40 mt-0.5 truncate">{concept.approach}</div>
+            {concept.visual_concept && (
+              <div className="text-[10px] text-white/40 mt-0.5 line-clamp-2 leading-snug">{concept.visual_concept}</div>
+            )}
           </div>
           {hasSVG && (
             <button
@@ -164,7 +169,7 @@ const COLOR_VERSIONS = [
 // ── Full-screen concept modal ─────────────────────────────────────────────────
 function ConceptModal({ concept, onClose }) {
   const [versionIdx, setVersionIdx] = useState(0);
-  const style    = getArchStyle(concept.approach || '');
+  const style    = getConceptStyle(concept.number || 1);
   const hasSVG   = Boolean(concept.svg) && !concept.svg.includes('SVG pending');
   const filename = `concept-${concept.number}-${(concept.name || '').toLowerCase().replace(/\s+/g, '-')}.svg`;
   const ver      = COLOR_VERSIONS[versionIdx];
@@ -236,7 +241,7 @@ function ConceptModal({ concept, onClose }) {
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold mb-2"
               style={{ background: style.bg, border: `1px solid ${style.border}`, color: style.color }}
             >
-              Concept {concept.number} — {concept.approach}
+              Concept {concept.number}
             </div>
             <h2 className="text-xl font-black text-white">{concept.name}</h2>
             {concept.typography && (
@@ -244,11 +249,11 @@ function ConceptModal({ concept, onClose }) {
             )}
           </div>
 
-          {/* Direction */}
-          {concept.direction && (
+          {/* Visual Concept */}
+          {concept.visual_concept && (
             <div className="rounded-xl px-4 py-3 bg-white/[0.02] border border-white/6">
-              <div className="text-[9px] font-black uppercase tracking-[0.2em] mb-1 text-white/30">Design Direction</div>
-              <p className="text-sm text-white/60 leading-relaxed">{concept.direction}</p>
+              <div className="text-[9px] font-black uppercase tracking-[0.2em] mb-1 text-white/30">Visual Concept</div>
+              <p className="text-sm text-white/60 leading-relaxed">{concept.visual_concept}</p>
             </div>
           )}
 
@@ -579,7 +584,8 @@ function RegeneratePanel({ onRegenerate, seedColors }) {
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
-            {ARCHETYPE_MAP.map(([name, color, border, bg]) => {
+            {DESIGN_DIRECTIONS.map((name, i) => {
+              const [color, border] = CONCEPT_COLORS[i % CONCEPT_COLORS.length];
               const active = selected.includes(name);
               return (
                 <button
@@ -589,7 +595,7 @@ function RegeneratePanel({ onRegenerate, seedColors }) {
                   style={
                     active
                       ? { background: border, borderColor: color, color }
-                      : { background: bg, borderColor: border, color: 'rgba(255,255,255,0.35)' }
+                      : { background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.35)' }
                   }
                 >
                   {name}
