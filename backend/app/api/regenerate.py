@@ -26,10 +26,18 @@ async def regenerate(
     if not project:
         raise HTTPException(404, "Project not found")
 
-    if project.status != "completed" and project.current_step < 7:
+    # Minimum current_step required for each regeneratable agent.
+    # current_step is incremented *after* an agent runs, so it equals step+1.
+    # visual_identity_agent = step 5 → current_step must be ≥ 6
+    # content_agent          = step 6 → current_step must be ≥ 7
+    _MIN_STEP = {"visual_identity_agent": 6, "content_agent": 7}
+    min_step = _MIN_STEP.get(payload.agent_name, 6)
+
+    if project.status != "completed" and project.current_step < min_step:
         raise HTTPException(
             400,
-            "Project must have completed at least through the content stage before regeneration.",
+            f"Project must have completed the '{payload.agent_name}' stage before it can be regenerated "
+            f"(current step: {project.current_step}, required: {min_step}).",
         )
 
     result = await regenerate_agents(db, project, payload.feedback)
