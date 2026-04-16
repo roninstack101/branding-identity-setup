@@ -23,6 +23,24 @@ function getArchStyle(approach = '') {
   return { color: '#94a3b8', border: 'rgba(148,163,184,0.2)', bg: 'rgba(148,163,184,0.06)' };
 }
 
+// ── Make SVG responsive (strip fixed px dimensions, keep viewBox) ─────────────
+function makeResponsive(svg) {
+  if (!svg) return svg;
+  // Ensure viewBox is set from width/height if missing
+  let processed = svg;
+  const wMatch = svg.match(/\swidth="(\d+)"/);
+  const hMatch = svg.match(/\sheight="(\d+)"/);
+  const hasViewBox = /viewBox=/.test(svg);
+  if (!hasViewBox && wMatch && hMatch) {
+    processed = processed.replace('<svg', `<svg viewBox="0 0 ${wMatch[1]} ${hMatch[1]}"`);
+  }
+  // Replace fixed px dimensions with 100%
+  processed = processed
+    .replace(/\swidth="\d+(\.\d+)?(px)?"/g, ' width="100%"')
+    .replace(/\sheight="\d+(\.\d+)?(px)?"/g, ' height="100%"');
+  return processed;
+}
+
 // ── Download SVG ──────────────────────────────────────────────────────────────
 function downloadSVG(svg, filename) {
   const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
@@ -57,11 +75,14 @@ function ConceptCard({ concept, onClick }) {
         {concept.svg ? (
           <div
             className="w-full h-full"
-            dangerouslySetInnerHTML={{ __html: concept.svg }}
-            style={{ lineHeight: 0 }}
+            dangerouslySetInnerHTML={{ __html: makeResponsive(concept.svg) }}
+            style={{ lineHeight: 0, display: 'flex' }}
           />
         ) : (
-          <div className="text-black/20 text-xs">Generating…</div>
+          <div className="flex flex-col items-center justify-center gap-1 h-full w-full py-8">
+            <div className="text-2xl opacity-20">◻</div>
+            <div className="text-black/20 text-xs">No SVG</div>
+          </div>
         )}
       </button>
 
@@ -121,11 +142,11 @@ function ConceptModal({ concept, onClose, primaryColor, accentColor }) {
           {concept.svg ? (
             <div
               className="w-full"
-              dangerouslySetInnerHTML={{ __html: concept.svg }}
+              dangerouslySetInnerHTML={{ __html: makeResponsive(concept.svg) }}
               style={{ lineHeight: 0 }}
             />
           ) : (
-            <div className="h-64 flex items-center justify-center text-black/20 text-sm">No SVG</div>
+            <div className="h-64 flex items-center justify-center text-black/20 text-sm">No SVG generated</div>
           )}
         </div>
 
