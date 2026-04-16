@@ -1,7 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 // ── Archetype accent colors ───────────────────────────────────────────────────
-// (populated via ARCHETYPE_MAP below)
 const ARCHETYPE_MAP = [
   ['Interlocked Monogram', '#818cf8', 'rgba(129,140,248,0.22)', 'rgba(129,140,248,0.08)'],
   ['Ecosystem Orbit',      '#34d399', 'rgba(52,211,153,0.22)',  'rgba(52,211,153,0.08)' ],
@@ -23,13 +22,55 @@ function getArchStyle(approach = '') {
   return { color: '#94a3b8', border: 'rgba(148,163,184,0.2)', bg: 'rgba(148,163,184,0.06)' };
 }
 
-// ── SVG → data URL (most reliable cross-browser rendering) ───────────────────
+// ── Color helpers (for palette generator) ────────────────────────────────────
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => {
+    const k = (n + h / 30) % 12;
+    const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * color).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+function generateHarmony() {
+  const base = Math.random() * 360;
+  const s    = 50 + Math.random() * 30;
+  // 5 hues: triad + split complementary pattern
+  const offsets = [0, 25, 170, 195, 330];
+  const lights   = [40, 55, 45, 60, 38];
+  return offsets.map((off, i) => hslToHex((base + off) % 360, s, lights[i]));
+}
+
+function isValidHex(str) {
+  return /^#[0-9a-fA-F]{6}$/.test(str);
+}
+
+// Returns white or dark depending on the bg color luminance
+function contrastColor(hex) {
+  if (!isValidHex(hex)) return 'rgba(255,255,255,0.75)';
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.55 ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.85)';
+}
+
+function contrastOverlay(hex) {
+  if (!isValidHex(hex)) return 'rgba(0,0,0,0.18)';
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.55 ? 'rgba(0,0,0,0.12)' : 'rgba(0,0,0,0.22)';
+}
+
+// ── SVG → data URL ────────────────────────────────────────────────────────────
 function svgToDataUrl(svg) {
   if (!svg) return '';
   try {
-    // Ensure xmlns is present (required for data URL rendering)
     let s = svg.includes('xmlns=') ? svg : svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
-    // Ensure viewBox preserved; strip fixed px so <img> scales naturally
     const wMatch = s.match(/width="(\d+)"/);
     const hMatch = s.match(/height="(\d+)"/);
     if (wMatch && hMatch && !s.includes('viewBox')) {
@@ -56,8 +97,8 @@ function downloadSVG(svg, filename) {
 
 // ── SVG Concept Card ──────────────────────────────────────────────────────────
 function ConceptCard({ concept, onClick }) {
-  const style   = getArchStyle(concept.approach || '');
-  const hasSVG  = Boolean(concept.svg) && !concept.svg.includes('SVG pending');
+  const style    = getArchStyle(concept.approach || '');
+  const hasSVG   = Boolean(concept.svg) && !concept.svg.includes('SVG pending');
   const filename = `concept-${concept.number}-${(concept.name || '').toLowerCase().replace(/\s+/g, '-')}.svg`;
 
   return (
@@ -94,7 +135,6 @@ function ConceptCard({ concept, onClick }) {
             </div>
             <div className="text-[10px] text-white/40 mt-0.5 truncate">{concept.approach}</div>
           </div>
-
           {hasSVG && (
             <button
               onClick={(e) => { e.stopPropagation(); e.preventDefault(); downloadSVG(concept.svg, filename); }}
@@ -106,7 +146,6 @@ function ConceptCard({ concept, onClick }) {
             </button>
           )}
         </div>
-
         {concept.rationale && (
           <p className="text-[10px] text-white/40 leading-snug line-clamp-2">{concept.rationale}</p>
         )}
@@ -130,28 +169,20 @@ function ConceptModal({ concept, onClose, primaryColor, accentColor }) {
         className="relative w-full max-w-2xl bg-slate-950 border border-white/10 rounded-3xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-all"
         >✕</button>
 
-        {/* SVG full preview */}
         <div className="bg-white w-full">
           {concept.svg ? (
-            <img
-              src={svgToDataUrl(concept.svg)}
-              alt={concept.name}
-              className="w-full"
-            />
+            <img src={svgToDataUrl(concept.svg)} alt={concept.name} className="w-full" />
           ) : (
             <div className="h-64 flex items-center justify-center text-black/20 text-sm">No SVG generated</div>
           )}
         </div>
 
-        {/* Details */}
         <div className="p-6 space-y-4">
-          {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <div>
               <div
@@ -173,7 +204,6 @@ function ConceptModal({ concept, onClose, primaryColor, accentColor }) {
             )}
           </div>
 
-          {/* Rationale */}
           {concept.rationale && (
             <div
               className="rounded-xl px-4 py-3"
@@ -186,7 +216,6 @@ function ConceptModal({ concept, onClose, primaryColor, accentColor }) {
             </div>
           )}
 
-          {/* Color tokens */}
           {(primaryColor || accentColor) && (
             <div className="flex gap-3">
               {primaryColor && (
@@ -280,6 +309,291 @@ function DesignBriefPanel({ briefText, competitorNotes, primaryColor, accentColo
   );
 }
 
+// ── Coolors-style color palette ───────────────────────────────────────────────
+function ColorSwatch({ hex, locked, index, onColorChange, onToggleLock }) {
+  const inputRef  = useRef(null);
+  const textRef   = useRef(null);
+  const [hovered, setHovered] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft,   setDraft]   = useState(hex.toUpperCase());
+  const [copied,  setCopied]  = useState(false);
+
+  // Keep draft in sync when hex changes externally
+  useEffect(() => { if (!editing) setDraft(hex.toUpperCase()); }, [hex, editing]);
+
+  const fg      = contrastColor(hex);
+  const overlay = contrastOverlay(hex);
+
+  const copyHex = (e) => {
+    e.stopPropagation();
+    navigator.clipboard?.writeText(hex.toUpperCase()).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1400);
+  };
+
+  const commitDraft = () => {
+    setEditing(false);
+    const val = draft.startsWith('#') ? draft : `#${draft}`;
+    if (isValidHex(val)) onColorChange(index, val.toLowerCase());
+    else setDraft(hex.toUpperCase());
+  };
+
+  return (
+    <div
+      className="relative flex-1 flex flex-col justify-between select-none transition-all duration-150"
+      style={{ backgroundColor: hex, minWidth: 0 }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {/* Native color picker — triggered programmatically */}
+      <input
+        ref={inputRef}
+        type="color"
+        value={hex}
+        onChange={(e) => { onColorChange(index, e.target.value); }}
+        className="absolute opacity-0 pointer-events-none w-0 h-0"
+        tabIndex={-1}
+      />
+
+      {/* Top row: copy + lock */}
+      <div
+        className="flex justify-between items-center p-2 transition-opacity duration-150"
+        style={{ opacity: hovered || locked ? 1 : 0 }}
+      >
+        {/* Copy */}
+        <button
+          onClick={copyHex}
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold transition-all hover:scale-110"
+          style={{ background: overlay, color: fg }}
+          title="Copy hex"
+        >
+          {copied ? '✓' : '⎘'}
+        </button>
+        {/* Lock */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleLock(index); }}
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-xs transition-all hover:scale-110"
+          style={{ background: overlay, color: fg }}
+          title={locked ? 'Unlock color' : 'Lock color'}
+        >
+          {locked ? '🔒' : '🔓'}
+        </button>
+      </div>
+
+      {/* Center: pencil icon on hover */}
+      <div
+        className="flex-1 flex items-center justify-center cursor-pointer transition-opacity duration-150"
+        style={{ opacity: hovered ? 1 : 0 }}
+        onClick={() => inputRef.current?.click()}
+        title="Edit color"
+      >
+        <div
+          className="w-9 h-9 rounded-full flex items-center justify-center text-base transition-transform hover:scale-110"
+          style={{ background: overlay, color: fg }}
+        >
+          ✎
+        </div>
+      </div>
+
+      {/* Bottom: hex label / inline edit */}
+      <div className="pb-3 pt-1 px-1 flex flex-col items-center gap-1">
+        {editing ? (
+          <input
+            ref={textRef}
+            value={draft}
+            maxLength={7}
+            onChange={(e) => setDraft(e.target.value.toUpperCase())}
+            onBlur={commitDraft}
+            onKeyDown={(e) => { if (e.key === 'Enter') commitDraft(); if (e.key === 'Escape') { setEditing(false); setDraft(hex.toUpperCase()); } }}
+            className="w-full text-center text-[11px] font-mono font-bold bg-black/20 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-white/40"
+            style={{ color: fg }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <button
+            className="text-[11px] font-mono font-bold tracking-wider px-1 py-0.5 rounded transition-all hover:bg-black/10"
+            style={{ color: fg }}
+            onClick={(e) => { e.stopPropagation(); setEditing(true); setTimeout(() => textRef.current?.select(), 30); }}
+            title="Edit hex"
+          >
+            {hex.toUpperCase()}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ColorPalettePanel({ palette, locked, onColorChange, onToggleLock, onNewPalette }) {
+  return (
+    <div className="space-y-2">
+      {/* Strips */}
+      <div
+        className="flex rounded-2xl overflow-hidden border border-white/10"
+        style={{ height: '200px', gap: '2px' }}
+      >
+        {palette.map((hex, i) => (
+          <ColorSwatch
+            key={i}
+            hex={hex}
+            locked={locked[i]}
+            index={i}
+            onColorChange={onColorChange}
+            onToggleLock={onToggleLock}
+          />
+        ))}
+      </div>
+
+      {/* Shuffle + hint */}
+      <div className="flex items-center justify-between">
+        <p className="text-[9px] text-white/25">
+          Click ✎ to pick · click hex to type · 🔒 to keep on shuffle
+        </p>
+        <button
+          onClick={onNewPalette}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-white/60 hover:text-white text-[10px] font-bold transition-all"
+        >
+          ⟳ Generate New
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Regenerate Panel (chat + directions + colors) ─────────────────────────────
+function RegeneratePanel({ onRegenerate, seedColors }) {
+  const [palette, setPalette] = useState(() => {
+    // Try to seed from AI-chosen colors, filling the rest with harmony
+    const harmony = generateHarmony();
+    const seeds   = (seedColors || []).filter(isValidHex);
+    return harmony.map((c, i) => seeds[i] || c);
+  });
+  const [locked,    setLocked]    = useState([false, false, false, false, false]);
+  const [chat,      setChat]      = useState('');
+  const [selected,  setSelected]  = useState([]);
+  const [loading,   setLoading]   = useState(false);
+
+  const toggleLock  = (i) => setLocked((l) => l.map((v, idx) => idx === i ? !v : v));
+  const updateColor = (i, hex) => setPalette((p) => p.map((v, idx) => idx === i ? hex : v));
+  const newPalette  = () => {
+    const fresh = generateHarmony();
+    setPalette((p) => p.map((v, i) => locked[i] ? v : fresh[i]));
+  };
+
+  const toggleDir = (name) =>
+    setSelected((d) => d.includes(name) ? d.filter((n) => n !== name) : [...d, name]);
+
+  const handleRegenerate = async () => {
+    if (!onRegenerate) return;
+    setLoading(true);
+    try {
+      const parts = [];
+      if (chat.trim()) parts.push(`User instructions: ${chat.trim()}.`);
+      if (selected.length > 0) parts.push(`Focus on these design directions: ${selected.join(', ')}.`);
+      parts.push(`Use this color palette: ${palette.join(', ')}.`);
+      await onRegenerate('visual_identity_agent', parts.join(' '));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-2xl border border-white/8 overflow-hidden" style={{ background: 'rgba(255,255,255,0.012)' }}>
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-white/6">
+        <div className="flex items-center gap-2.5">
+          <span className="text-base">🎨</span>
+          <div>
+            <div className="text-sm font-black text-white/85">Customize & Regenerate</div>
+            <div className="text-[10px] text-white/30 mt-0.5">Set your colors, pick design directions, and give the AI instructions</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-5 space-y-6">
+        {/* Color palette */}
+        <div className="space-y-2">
+          <div className="text-[10px] font-black uppercase tracking-[0.15em] text-white/35">Color Palette</div>
+          <ColorPalettePanel
+            palette={palette}
+            locked={locked}
+            onColorChange={updateColor}
+            onToggleLock={toggleLock}
+            onNewPalette={newPalette}
+          />
+        </div>
+
+        {/* Design direction chips */}
+        <div className="space-y-2">
+          <div className="text-[10px] font-black uppercase tracking-[0.15em] text-white/35">
+            Design Direction
+            <span className="ml-2 text-white/20 normal-case font-normal tracking-normal">
+              {selected.length === 0 ? '— all styles (leave blank for variety)' : `— ${selected.length} selected`}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {ARCHETYPE_MAP.map(([name, color, border, bg]) => {
+              const active = selected.includes(name);
+              return (
+                <button
+                  key={name}
+                  onClick={() => toggleDir(name)}
+                  className="px-3 py-1.5 rounded-full text-[10px] font-bold border transition-all"
+                  style={
+                    active
+                      ? { background: border, borderColor: color, color }
+                      : { background: bg, borderColor: border, color: 'rgba(255,255,255,0.35)' }
+                  }
+                >
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Chat / instruction box */}
+        <div className="space-y-2">
+          <div className="text-[10px] font-black uppercase tracking-[0.15em] text-white/35">Instructions for AI</div>
+          <textarea
+            value={chat}
+            onChange={(e) => setChat(e.target.value)}
+            placeholder="Describe what you want to change…&#10;e.g. Make it feel more premium and minimal, avoid circles, use geometric letterforms"
+            rows={3}
+            className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-sm text-white/80 placeholder-white/20 focus:outline-none focus:border-white/25 focus:bg-white/[0.05] transition-all resize-none leading-relaxed"
+          />
+        </div>
+
+        {/* Regenerate CTA */}
+        <div className="flex items-center justify-between gap-4 pt-1">
+          <p className="text-[10px] text-white/25 leading-relaxed max-w-xs">
+            AI will use your colors &amp; instructions to regenerate all 10 logo concepts
+          </p>
+          <button
+            onClick={handleRegenerate}
+            disabled={loading || !onRegenerate}
+            className="flex-shrink-0 flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              background: loading ? 'rgba(99,102,241,0.3)' : 'rgba(99,102,241,0.85)',
+              color: '#fff',
+              boxShadow: loading ? 'none' : '0 0 20px rgba(99,102,241,0.35)',
+            }}
+          >
+            {loading ? (
+              <>
+                <span className="inline-block w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Generating…
+              </>
+            ) : (
+              <>✦ Regenerate Logos</>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Download all as individual files ─────────────────────────────────────────
 function downloadAll(concepts, brandName) {
   concepts.forEach((c, i) => {
@@ -287,7 +601,7 @@ function downloadAll(concepts, brandName) {
     setTimeout(() => {
       const name = `${brandName.toLowerCase().replace(/\s+/g, '-')}-concept-${c.number}-${(c.name || '').toLowerCase().replace(/\s+/g, '-')}.svg`;
       downloadSVG(c.svg, name);
-    }, i * 200); // stagger downloads 200ms apart
+    }, i * 200);
   });
 }
 
@@ -297,14 +611,18 @@ export default function VariantGallery({ data, onRegenerate }) {
 
   if (!data) return null;
 
-  const concepts       = Array.isArray(data.design_concepts) ? data.design_concepts : [];
-  const briefText      = data.logo_design_brief   || '';
-  const primaryColor   = data.primary_color       || '';
-  const accentColor    = data.accent_color        || '';
-  const font           = data.font                || '';
-  const compNotes      = data.competitor_visual_notes || '';
+  const concepts     = Array.isArray(data.design_concepts) ? data.design_concepts : [];
+  const briefText    = data.logo_design_brief        || '';
+  const primaryColor = data.primary_color            || '';
+  const accentColor  = data.accent_color             || '';
+  const font         = data.font                     || '';
+  const compNotes    = data.competitor_visual_notes  || '';
 
-  const hasSVGs = concepts.some((c) => c.svg && !c.svg.includes('SVG pending'));
+  // Seed colors from AI output for the palette panel
+  const seedColors = [primaryColor, accentColor].filter(Boolean);
+
+  const hasSVGs   = concepts.some((c) => c.svg && !c.svg.includes('SVG pending'));
+  const svgCount  = concepts.filter((c) => c.svg && !c.svg.includes('SVG pending')).length;
 
   if (concepts.length === 0 && !briefText) {
     return (
@@ -327,8 +645,6 @@ export default function VariantGallery({ data, onRegenerate }) {
     );
   }
 
-  const svgCount = concepts.filter((c) => c.svg && !c.svg.includes('SVG pending')).length;
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -347,14 +663,6 @@ export default function VariantGallery({ data, onRegenerate }) {
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/70 hover:text-white transition-all text-sm font-semibold"
             >
               ↓ Download All SVGs
-            </button>
-          )}
-          {onRegenerate && (
-            <button
-              onClick={() => onRegenerate('visual_identity_agent', 'regenerate logo concepts with fresh visual directions')}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/70 hover:text-white transition-all text-sm font-semibold"
-            >
-              Regenerate
             </button>
           )}
         </div>
@@ -397,7 +705,7 @@ export default function VariantGallery({ data, onRegenerate }) {
         </div>
       )}
 
-      {/* SVG Grid — 2 cols on mobile, 3 on md, 5 on xl */}
+      {/* SVG Grid — 2 cols mobile, 3 md, 5 xl */}
       {concepts.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
           {concepts.map((c) => (
@@ -414,6 +722,11 @@ export default function VariantGallery({ data, onRegenerate }) {
         accentColor={accentColor}
         font={font}
       />
+
+      {/* Regenerate panel — chat + color picker + direction selector */}
+      {onRegenerate && (
+        <RegeneratePanel onRegenerate={onRegenerate} seedColors={seedColors} />
+      )}
 
       {/* Concept modal */}
       {selected && (
