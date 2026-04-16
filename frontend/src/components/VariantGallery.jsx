@@ -154,11 +154,23 @@ function ConceptCard({ concept, onClick }) {
   );
 }
 
+// ── Color version configs for modal tabs ─────────────────────────────────────
+const COLOR_VERSIONS = [
+  { label: 'Full Colour', bg: '#ffffff', imgFilter: 'none',                        dark: false },
+  { label: 'Monochrome',  bg: '#ffffff', imgFilter: 'grayscale(1) contrast(1.15)', dark: false },
+  { label: 'Dark',        bg: '#0f172a', imgFilter: 'invert(1)',                   dark: true  },
+];
+
 // ── Full-screen concept modal ─────────────────────────────────────────────────
-function ConceptModal({ concept, onClose, primaryColor, accentColor }) {
+function ConceptModal({ concept, onClose }) {
+  const [versionIdx, setVersionIdx] = useState(0);
   const style    = getArchStyle(concept.approach || '');
   const hasSVG   = Boolean(concept.svg) && !concept.svg.includes('SVG pending');
   const filename = `concept-${concept.number}-${(concept.name || '').toLowerCase().replace(/\s+/g, '-')}.svg`;
+  const ver      = COLOR_VERSIONS[versionIdx];
+
+  // Concept-level palette (from AI) or empty
+  const palette = Array.isArray(concept.palette) ? concept.palette.filter(Boolean) : [];
 
   return (
     <div
@@ -166,7 +178,7 @@ function ConceptModal({ concept, onClose, primaryColor, accentColor }) {
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-2xl bg-slate-950 border border-white/10 rounded-3xl shadow-2xl overflow-hidden"
+        className="relative w-full max-w-2xl bg-slate-950 border border-white/10 rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -174,62 +186,97 @@ function ConceptModal({ concept, onClose, primaryColor, accentColor }) {
           className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-all"
         >✕</button>
 
-        <div className="bg-white w-full">
-          {concept.svg ? (
-            <img src={svgToDataUrl(concept.svg)} alt={concept.name} className="w-full" />
-          ) : (
-            <div className="h-64 flex items-center justify-center text-black/20 text-sm">No SVG generated</div>
+        {/* Version tabs */}
+        <div className="flex gap-1 px-5 pt-5 pb-3 flex-shrink-0">
+          {COLOR_VERSIONS.map((v, i) => (
+            <button
+              key={v.label}
+              onClick={() => setVersionIdx(i)}
+              className="px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all border"
+              style={
+                i === versionIdx
+                  ? { background: style.border, borderColor: style.color, color: style.color }
+                  : { background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.4)' }
+              }
+            >
+              {v.label}
+            </button>
+          ))}
+          <div className="flex-1" />
+          {hasSVG && (
+            <button
+              onClick={() => downloadSVG(concept.svg, filename)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all"
+              style={{ background: style.border, color: style.color }}
+            >
+              ↓ SVG
+            </button>
           )}
         </div>
 
-        <div className="p-6 space-y-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold mb-2"
-                style={{ background: style.bg, border: `1px solid ${style.border}`, color: style.color }}
-              >
-                Concept {concept.number} — {concept.approach}
-              </div>
-              <h2 className="text-xl font-black text-white">{concept.name}</h2>
+        {/* SVG preview */}
+        <div className="w-full transition-colors duration-200 flex-shrink-0" style={{ backgroundColor: ver.bg }}>
+          {concept.svg ? (
+            <img
+              src={svgToDataUrl(concept.svg)}
+              alt={concept.name}
+              className="w-full"
+              style={{ filter: ver.imgFilter, transition: 'filter 0.2s' }}
+            />
+          ) : (
+            <div className="h-48 flex items-center justify-center text-black/20 text-sm">No SVG generated</div>
+          )}
+        </div>
+
+        {/* Details — scrollable */}
+        <div className="p-5 space-y-4 overflow-y-auto">
+          {/* Header */}
+          <div>
+            <div
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold mb-2"
+              style={{ background: style.bg, border: `1px solid ${style.border}`, color: style.color }}
+            >
+              Concept {concept.number} — {concept.approach}
             </div>
-            {hasSVG && (
-              <button
-                onClick={() => downloadSVG(concept.svg, filename)}
-                className="flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all"
-                style={{ background: style.border, color: style.color }}
-              >
-                ↓ Download SVG
-              </button>
+            <h2 className="text-xl font-black text-white">{concept.name}</h2>
+            {concept.typography && (
+              <div className="text-[10px] text-white/30 mt-0.5">Typography: {concept.typography}</div>
             )}
           </div>
 
+          {/* Direction */}
+          {concept.direction && (
+            <div className="rounded-xl px-4 py-3 bg-white/[0.02] border border-white/6">
+              <div className="text-[9px] font-black uppercase tracking-[0.2em] mb-1 text-white/30">Design Direction</div>
+              <p className="text-sm text-white/60 leading-relaxed">{concept.direction}</p>
+            </div>
+          )}
+
+          {/* Rationale */}
           {concept.rationale && (
             <div
               className="rounded-xl px-4 py-3"
               style={{ background: style.bg, border: `1px solid ${style.border}` }}
             >
               <div className="text-[9px] font-black uppercase tracking-[0.2em] mb-1" style={{ color: style.color }}>
-                Design Rationale
+                Creative Rationale
               </div>
               <p className="text-sm text-white/65 leading-relaxed">{concept.rationale}</p>
             </div>
           )}
 
-          {(primaryColor || accentColor) && (
-            <div className="flex gap-3">
-              {primaryColor && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/8 bg-white/[0.02]">
-                  <div className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: primaryColor }} />
-                  <span className="text-[11px] font-mono text-white/50">{primaryColor}</span>
-                </div>
-              )}
-              {accentColor && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/8 bg-white/[0.02]">
-                  <div className="w-4 h-4 rounded-full border border-white/20" style={{ backgroundColor: accentColor }} />
-                  <span className="text-[11px] font-mono text-white/50">{accentColor}</span>
-                </div>
-              )}
+          {/* Concept palette */}
+          {palette.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-[9px] font-black uppercase tracking-[0.2em] text-white/30">Colour Palette</div>
+              <div className="flex gap-2 flex-wrap">
+                {palette.map((hex, i) => (
+                  <div key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-white/8 bg-white/[0.02]">
+                    <div className="w-3.5 h-3.5 rounded-full border border-white/20" style={{ backgroundColor: hex }} />
+                    <span className="text-[10px] font-mono text-white/50">{hex}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -732,8 +779,6 @@ export default function VariantGallery({ data, onRegenerate }) {
       {selected && (
         <ConceptModal
           concept={selected}
-          primaryColor={primaryColor}
-          accentColor={accentColor}
           onClose={() => setSelected(null)}
         />
       )}

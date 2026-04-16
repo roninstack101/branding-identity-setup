@@ -98,39 +98,141 @@ STRICT RULES:
 GEMINI_BRIEF_SYSTEM = """You are a world-class brand identity director at a top-tier creative agency (Pentagram / Landor / Wolff Olins level).
 
 Use Google Search to:
-1. Research the brand's top 3-5 direct competitors — find their actual logo styles, colors, visual identity details
-2. Find 2024-2025 logo design trends specific to this industry
-3. Identify unclaimed visual territory — directions no competitor has taken
+1. Research the brand's top 3-5 direct competitors — find their actual logo styles, colours, fonts, visual identity
+2. Find 2024-2025 logo/brand design trends specific to this industry
+3. Identify unclaimed visual territory — directions no competitor has taken yet
 
-Generate a comprehensive 10-concept logo design brief. Return ONLY valid JSON:
+Generate a comprehensive 10-concept logo design brief using the industry-standard template below.
+Return ONLY valid JSON (no markdown fences, no text outside the JSON):
 
 {
-  "brief_text": "Full formatted design brief (1000+ words). Sections: BRAND OVERVIEW, COMPETITOR VISUAL LANDSCAPE (real names + visual details from search), 2024-25 INDUSTRY TRENDS (from search), DESIGN DIRECTION, 10 LOGO CONCEPTS. Use section headers.",
+  "brief_text": "Full formatted design brief (1200+ words) structured as follows:
+
+━━━ BRAND OVERVIEW ━━━
+Full company name (abbreviation). Industry / sector. Core business description — what it does, key divisions/products/services, geographic focus. Brand essence / tagline. Values (list). Primary audience, secondary audience, tertiary audience.
+
+━━━ DESIGN REQUIREMENTS ━━━
+Symbol + wordmark logo system. Style descriptors. Symbol must abstractly express (5-7 keywords from brand essence, values, business model). Typography direction. Colour palette with primary (name + hex range), accent options, neutrals. 2024-25 design trends applied. Must work at: favicon, app icon, signage, digital UI, print, merchandise. Deliver 3 versions per concept: 1. Full-colour  2. Monochrome (black/white)  3. Inverted on dark background.
+
+━━━ COMPETITOR VISUAL LANDSCAPE ━━━
+(FROM LIVE SEARCH) Real competitor names, their logo styles, dominant colours, typography choices. Visual territory already occupied. Unclaimed visual space this brand can own.
+
+━━━ 2024-25 INDUSTRY DESIGN TRENDS ━━━
+(FROM LIVE SEARCH) Specific current trends relevant to this industry. Flat/minimal geometry, subtle gradients, responsive icon systems, monogram-friendly variants, plus industry-specific trend.
+
+━━━ 10 LOGO CONCEPT DIRECTIONS ━━━
+For each: concept number, visual approach name, brand-specific description of the direction, one-line rationale, typography, palette.",
+
   "concepts": [
-    {"number": 1, "name": "short name", "approach": "Interlocked Monogram", "rationale": "one sentence specific to this brand"},
-    {"number": 2, "name": "short name", "approach": "Ecosystem Orbit", "rationale": "one sentence"},
-    {"number": 3, "name": "short name", "approach": "Growth Stack", "rationale": "one sentence"},
-    {"number": 4, "name": "short name", "approach": "Bridge Arc", "rationale": "one sentence"},
-    {"number": 5, "name": "short name", "approach": "Tri-form Overlap", "rationale": "one sentence"},
-    {"number": 6, "name": "short name", "approach": "Network Nodes", "rationale": "one sentence"},
-    {"number": 7, "name": "short name", "approach": "Dynamic Sweep", "rationale": "one sentence"},
-    {"number": 8, "name": "short name", "approach": "Digital Grid", "rationale": "one sentence"},
-    {"number": 9, "name": "short name", "approach": "Globe / Planet", "rationale": "one sentence"},
-    {"number": 10, "name": "short name", "approach": "Journey Swoosh + Dot", "rationale": "one sentence"}
+    {
+      "number": 1,
+      "name": "short memorable name",
+      "approach": "Interlocked Monogram",
+      "direction": "Brand-specific: describe which letters interlock and what the combined form symbolises for this brand",
+      "rationale": "One-line creative rationale — why this direction fits this brand specifically",
+      "typography": "Google Font name",
+      "palette": ["#primary", "#accent", "#neutral"]
+    },
+    {
+      "number": 2,
+      "name": "short memorable name",
+      "approach": "Ecosystem Orbit",
+      "direction": "Brand-specific: what central concept is the hub, what orbits it, what does it express about the business",
+      "rationale": "one sentence",
+      "typography": "Google Font name",
+      "palette": ["#primary", "#accent", "#neutral"]
+    },
+    {
+      "number": 3,
+      "name": "short memorable name",
+      "approach": "Growth Stack",
+      "direction": "Brand-specific: what does the ascending stack represent — divisions, milestones, market growth",
+      "rationale": "one sentence",
+      "typography": "Google Font name",
+      "palette": ["#primary", "#accent", "#neutral"]
+    },
+    {
+      "number": 4,
+      "name": "short memorable name",
+      "approach": "Bridge Arc",
+      "direction": "Brand-specific: what two entities / stakeholders / concepts does the arc connect",
+      "rationale": "one sentence",
+      "typography": "Google Font name",
+      "palette": ["#primary", "#accent", "#neutral"]
+    },
+    {
+      "number": 5,
+      "name": "short memorable name",
+      "approach": "Tri-form Overlap",
+      "direction": "Brand-specific: what three pillars / divisions / audiences do the three forms represent",
+      "rationale": "one sentence",
+      "typography": "Google Font name",
+      "palette": ["#primary", "#accent", "#neutral"]
+    },
+    {
+      "number": 6,
+      "name": "short memorable name",
+      "approach": "Network Nodes",
+      "direction": "Brand-specific: what does the network represent — partners, markets, service touchpoints",
+      "rationale": "one sentence",
+      "typography": "Google Font name",
+      "palette": ["#primary", "#accent", "#neutral"]
+    },
+    {
+      "number": 7,
+      "name": "short memorable name",
+      "approach": "Dynamic Sweep",
+      "direction": "Brand-specific: what does the bold motion express — speed, momentum, transformation",
+      "rationale": "one sentence",
+      "typography": "Google Font name",
+      "palette": ["#primary", "#accent", "#neutral"]
+    },
+    {
+      "number": 8,
+      "name": "short memorable name",
+      "approach": "Digital Grid",
+      "direction": "Brand-specific: how does the structured grid reflect the brand's precision, technology, or system",
+      "rationale": "one sentence",
+      "typography": "Google Font name",
+      "palette": ["#primary", "#accent", "#neutral"]
+    },
+    {
+      "number": 9,
+      "name": "short memorable name",
+      "approach": "Globe / Planet",
+      "direction": "Brand-specific: what global or expansive concept does this express — reach, scale, ambition",
+      "rationale": "one sentence",
+      "typography": "Google Font name",
+      "palette": ["#primary", "#accent", "#neutral"]
+    },
+    {
+      "number": 10,
+      "name": "short memorable name",
+      "approach": "Journey Swoosh + Dot",
+      "direction": "Brand-specific: what journey or transformation does the curve represent — origin to destination",
+      "rationale": "one sentence",
+      "typography": "Google Font name",
+      "palette": ["#primary", "#accent", "#neutral"]
+    }
   ],
+
   "primary_color": "#hex",
   "accent_color": "#hex",
   "neutral_dark": "#1A1A2E",
-  "font": "Google Font name",
-  "competitor_visual_notes": "2-3 sentences on competitor visual landscape and unclaimed territory"
+  "font": "primary Google Font for the brand wordmark",
+  "style_descriptors": "modern, geometric, minimal, premium — add 2-3 brand-specific style words",
+  "symbol_concepts": "5-7 keywords the symbol abstractly expresses (derived from brand essence + values)",
+  "competitor_visual_notes": "3-4 sentences from live search: competitor names + visual styles + unclaimed territory"
 }
 
-Return ONLY valid JSON. No markdown fences, no text outside the JSON."""
+Keep exact approach names. Return ONLY valid JSON."""
 
 _FALLBACK_BRIEF_SYSTEM = (
-    "You are a brand identity director. Generate a 10-concept logo design brief. "
-    "Return ONLY valid JSON with keys: brief_text, concepts (array of 10 with number/name/approach/rationale), "
-    "primary_color, accent_color, neutral_dark, font, competitor_visual_notes."
+    "You are a brand identity director. Generate a 10-concept logo design brief following the industry-standard template. "
+    "Return ONLY valid JSON with keys: brief_text (structured with sections: BRAND OVERVIEW, DESIGN REQUIREMENTS, "
+    "COMPETITOR VISUAL LANDSCAPE, 2024-25 TRENDS, 10 LOGO CONCEPT DIRECTIONS), "
+    "concepts (array of 10 each with: number, name, approach, direction, rationale, typography, palette), "
+    "primary_color, accent_color, neutral_dark, font, style_descriptors, symbol_concepts, competitor_visual_notes."
 )
 
 
@@ -255,20 +357,31 @@ async def _generate_concept_svgs(
                 guide_raw = val
                 break
 
+        # Use concept-level palette if provided, otherwise fall back to global
+        concept_palette = concept.get("palette", [])
+        c_primary = concept_palette[0] if concept_palette else primary_color
+        c_accent  = concept_palette[1] if len(concept_palette) > 1 else accent_color
+
+        # Re-apply color substitutions with concept-level palette
         guide = (
             guide_raw
-            .replace("{primary}", primary_color)
-            .replace("{accent}", accent_color)
-            .replace("primary color", primary_color)
-            .replace("accent color", accent_color)
+            .replace("{primary}", c_primary)
+            .replace("{accent}", c_accent)
+            .replace("primary color", c_primary)
+            .replace("accent color", c_accent)
         )
+
+        direction_note = concept.get("direction", "")
+        typo_note = concept.get("typography", "Arial, Helvetica, sans-serif")
 
         prompt = (
             f"{_SVG_SYSTEM_PROMPT}\n\n"
             f"Brand: {brand_name} | Abbreviation: {abbreviation} | Tagline: {tagline}\n"
             f"Concept {concept['number']}: {concept['name']} — {approach}\n"
+            f"Design Direction: {direction_note}\n"
             f"Rationale: {concept.get('rationale', '')}\n"
-            f"Primary color: {primary_color} | Accent color: {accent_color}\n\n"
+            f"Primary color: {c_primary} | Accent color: {c_accent}\n"
+            f"Typography: {typo_note}\n\n"
             f"SYMBOL CONSTRUCTION (follow precisely):\n{guide}\n\n"
             f"SVG SPEC: viewBox=\"0 0 400 400\" width=\"400\" height=\"400\" xmlns=\"http://www.w3.org/2000/svg\"\n\n"
             f"REQUIRED STRUCTURE:\n"
@@ -276,9 +389,9 @@ async def _generate_concept_svgs(
             f"2. Draw the symbol mark centered in the area x:60-340, y:30-270 using the construction guide above\n"
             f'3. <line x1="60" y1="283" x2="340" y2="283" stroke="#e5e7eb" stroke-width="1"/>\n'
             f'4. <text x="200" y="316" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" '
-            f'font-size="26" font-weight="700" fill="{primary_color}">{brand_name}</text>\n'
+            f'font-size="26" font-weight="700" fill="{c_primary}">{brand_name}</text>\n'
             f'5. <text x="200" y="346" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" '
-            f'font-size="11" font-weight="600" letter-spacing="5" fill="{accent_color}">{abbreviation}</text>\n'
+            f'font-size="11" font-weight="600" letter-spacing="5" fill="{c_accent}">{abbreviation}</text>\n'
             f'6. <text x="200" y="383" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" '
             f'font-size="9" fill="#9ca3af">{concept["number"]}. {concept["name"].upper()}</text>\n\n'
             f"Return ONLY the complete SVG. No text before or after."
@@ -362,17 +475,36 @@ async def run(
     abbreviation = "".join(w[0].upper() for w in brand_name.split() if w)
 
     # ── Step 1: Gemini generates design brief ─────────────────────────────────
+    values_str    = ", ".join(str(v) for v in brand_values) if brand_values else "Not specified"
+    audience_list = [str(s) for s in target_segs[:3]]
+    audience_str  = ", ".join(audience_list) if audience_list else "General market"
+    competitors_str = ", ".join(competitor_names) if competitor_names else "research online"
+    trends_str    = ", ".join(str(t) for t in market_trends[:4]) if market_trends else "research current trends"
+
     user_prompt = (
-        f"Brand Name: {brand_name}\nAbbreviation: {abbreviation}\nTagline: {tagline}\n"
-        f"Industry: {industry}\nBusiness: {problem}\nValue Proposition: {value_prop}\n"
-        f"Brand Personality: {archetype} — {tone_voice}\nTone Hints: {tone_hints}\n"
-        f"Brand Values: {', '.join(str(v) for v in brand_values)}\n"
-        f"Target Audience: {json.dumps(target_segs[:2])}\n"
-        f"Known Competitors: {', '.join(competitor_names) or 'None identified yet'}\n"
+        f"Create 10 distinct, high-quality logo concepts for:\n\n"
+        f"Company: {brand_name} ({abbreviation})\n"
+        f"Industry / Sector: {industry}\n"
+        f"Core Business: {problem}. {value_prop}\n"
+        f'Brand Essence / Tagline: "{tagline}"\n'
+        f"Brand Personality: {archetype} — {tone_voice}\n"
+        f"Tone Hints: {tone_hints}\n"
+        f"Values: {values_str}\n"
+        f"Target Audiences: {audience_str}\n"
+        f"Known Competitors: {competitors_str}\n"
         f"Positioning: {positioning}\n"
-        f"Market Trends: {', '.join(str(t) for t in market_trends[:4])}\n"
-        + (f"\nFeedback to apply: {feedback}\n" if feedback else "")
-        + "\nResearch competitors online and generate the 10-concept logo design brief."
+        f"Market Trends Identified: {trends_str}\n\n"
+        f"Design Requirements:\n"
+        f"- Symbol + wordmark logo system\n"
+        f"- Style: modern, geometric, minimal, premium yet accessible — refine based on brand personality\n"
+        f"- Symbol must abstractly express the brand's core values and business model (5-7 keywords)\n"
+        f"- Typography: modern sans-serif, clean, strong, highly legible\n"
+        f"- Colour palette: research 2024-25 trends for {industry}, avoid colours dominated by competitors\n"
+        f"- Must work at: favicon, app icon, signage, digital UI, print, merchandise\n"
+        f"- Deliver 3 versions per concept: 1. Full-colour  2. Monochrome (black/white)  3. Inverted on dark background\n"
+        f"- Latest 2024-25 trends: flat/minimal geometry, subtle gradients, responsive icon system, monogram-friendly\n\n"
+        + (f"Additional feedback to apply: {feedback}\n\n" if feedback else "")
+        + f"Research {competitors_str} and other competitors online. Generate the full 10-concept brief following the template."
     )
 
     print(f"[visual_identity_agent] Step 1 — Gemini brief for '{brand_name}'")
@@ -402,13 +534,15 @@ async def run(
         except Exception:
             brief_data = {}
 
-    brief_text       = brief_data.get("brief_text", "")
-    concepts         = brief_data.get("concepts", [])
-    primary_color    = brief_data.get("primary_color", "#005B80")
-    accent_color     = brief_data.get("accent_color", "#FFB300")
-    neutral_dark     = brief_data.get("neutral_dark", "#1A1A2E")
-    font             = brief_data.get("font", "Inter")
-    competitor_notes = brief_data.get("competitor_visual_notes", "")
+    brief_text        = brief_data.get("brief_text", "")
+    concepts          = brief_data.get("concepts", [])
+    primary_color     = brief_data.get("primary_color", "#005B80")
+    accent_color      = brief_data.get("accent_color", "#FFB300")
+    neutral_dark      = brief_data.get("neutral_dark", "#1A1A2E")
+    font              = brief_data.get("font", "Inter")
+    style_descriptors = brief_data.get("style_descriptors", "")
+    symbol_concepts   = brief_data.get("symbol_concepts", "")
+    competitor_notes  = brief_data.get("competitor_visual_notes", "")
 
     if not isinstance(concepts, list):
         concepts = []
@@ -438,6 +572,8 @@ async def run(
         "accent_color":            accent_color,
         "neutral_dark":            neutral_dark,
         "font":                    font,
+        "style_descriptors":       style_descriptors,
+        "symbol_concepts":         symbol_concepts,
         "logo_inspiration":        inspiration_links,
         # Legacy keys
         "variants":                [],
