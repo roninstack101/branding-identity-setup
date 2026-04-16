@@ -23,22 +23,22 @@ function getArchStyle(approach = '') {
   return { color: '#94a3b8', border: 'rgba(148,163,184,0.2)', bg: 'rgba(148,163,184,0.06)' };
 }
 
-// ── Make SVG responsive (strip fixed px dimensions, keep viewBox) ─────────────
-function makeResponsive(svg) {
-  if (!svg) return svg;
-  // Ensure viewBox is set from width/height if missing
-  let processed = svg;
-  const wMatch = svg.match(/\swidth="(\d+)"/);
-  const hMatch = svg.match(/\sheight="(\d+)"/);
-  const hasViewBox = /viewBox=/.test(svg);
-  if (!hasViewBox && wMatch && hMatch) {
-    processed = processed.replace('<svg', `<svg viewBox="0 0 ${wMatch[1]} ${hMatch[1]}"`);
+// ── SVG → data URL (most reliable cross-browser rendering) ───────────────────
+function svgToDataUrl(svg) {
+  if (!svg) return '';
+  try {
+    // Ensure xmlns is present (required for data URL rendering)
+    let s = svg.includes('xmlns=') ? svg : svg.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+    // Ensure viewBox preserved; strip fixed px so <img> scales naturally
+    const wMatch = s.match(/width="(\d+)"/);
+    const hMatch = s.match(/height="(\d+)"/);
+    if (wMatch && hMatch && !s.includes('viewBox')) {
+      s = s.replace('<svg', `<svg viewBox="0 0 ${wMatch[1]} ${hMatch[1]}"`);
+    }
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(s)}`;
+  } catch {
+    return '';
   }
-  // Replace fixed px dimensions with 100%
-  processed = processed
-    .replace(/\swidth="\d+(\.\d+)?(px)?"/g, ' width="100%"')
-    .replace(/\sheight="\d+(\.\d+)?(px)?"/g, ' height="100%"');
-  return processed;
 }
 
 // ── Download SVG ──────────────────────────────────────────────────────────────
@@ -73,10 +73,10 @@ function ConceptCard({ concept, onClick }) {
         title="Click to expand"
       >
         {concept.svg ? (
-          <div
-            className="w-full h-full"
-            dangerouslySetInnerHTML={{ __html: makeResponsive(concept.svg) }}
-            style={{ lineHeight: 0, display: 'flex' }}
+          <img
+            src={svgToDataUrl(concept.svg)}
+            alt={concept.name}
+            className="w-full h-full object-contain"
           />
         ) : (
           <div className="flex flex-col items-center justify-center gap-1 h-full w-full py-8">
@@ -140,10 +140,10 @@ function ConceptModal({ concept, onClose, primaryColor, accentColor }) {
         {/* SVG full preview */}
         <div className="bg-white w-full">
           {concept.svg ? (
-            <div
+            <img
+              src={svgToDataUrl(concept.svg)}
+              alt={concept.name}
               className="w-full"
-              dangerouslySetInnerHTML={{ __html: makeResponsive(concept.svg) }}
-              style={{ lineHeight: 0 }}
             />
           ) : (
             <div className="h-64 flex items-center justify-center text-black/20 text-sm">No SVG generated</div>
