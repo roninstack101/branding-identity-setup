@@ -321,15 +321,7 @@ async def run(
     # ── Step 2: OpenAI generates the logo grid image ───────────────────────────
     image_result: dict = {}
     if image_prompt_raw:
-        # Enrich the image prompt with brand context if it's too sparse
-        if len(image_prompt_raw) < 800:
-            image_prompt_raw = (
-                f"Professional brand identity presentation sheet on white background. "
-                f"Title at top: '{brand_name} ({abbreviation}) — 10 Distinct Logo Concepts'. "
-                f"Tagline: '{tagline}'. Industry: {industry}.\n\n"
-                + image_prompt_raw
-            )
-        print(f"[visual_identity_agent] Generating image with prompt length={len(image_prompt_raw)}")
+        print(f"[visual_identity_agent] Generating image with full prompt length={len(image_prompt_raw)}")
         image_result = await generate_logo_image(image_prompt_raw)
     else:
         print("[visual_identity_agent] No image prompt from Gemini — skipping image generation")

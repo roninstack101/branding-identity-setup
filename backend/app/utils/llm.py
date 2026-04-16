@@ -102,13 +102,11 @@ async def generate_logo_image(prompt: str) -> dict:
         print("[Image] ERROR: OPENAI_API_KEY not set")
         return {"error": "OPENAI_API_KEY not set"}
 
-    truncated = prompt[:4000]
-
     # Attempt 1: gpt-image-1 (ChatGPT-quality logo generation)
     try:
         response = await _openai_client.images.generate(
             model="gpt-image-1",
-            prompt=truncated,
+            prompt=prompt,
             n=1,
             size="1536x1024",
         )
@@ -120,11 +118,11 @@ async def generate_logo_image(prompt: str) -> dict:
     except Exception as exc:
         print(f"[Image] gpt-image-1 failed: {type(exc).__name__}: {str(exc)[:200]}")
 
-    # Attempt 2: dall-e-3 (widely available fallback)
+    # Attempt 2: dall-e-3 (widely available fallback — max 4000 chars)
     try:
         response = await _openai_client.images.generate(
             model="dall-e-3",
-            prompt=truncated,
+            prompt=prompt[:4000],
             n=1,
             size="1792x1024",
             quality="hd",
