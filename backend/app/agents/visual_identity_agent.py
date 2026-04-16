@@ -231,8 +231,6 @@ async def _generate_concept_svgs(
     primary_color: str,
     accent_color: str,
 ) -> list[dict]:
-    import asyncio
-
     def _placeholder(number: int, name: str) -> str:
         return (
             f'<svg viewBox="0 0 400 400" width="400" height="400" xmlns="http://www.w3.org/2000/svg">'
@@ -293,16 +291,15 @@ async def _generate_concept_svgs(
 
         return {**concept, "svg": svg}
 
-    tasks = [_generate_one(c) for c in concepts]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
     final: list[dict] = []
-    for i, result in enumerate(results):
-        if isinstance(result, Exception):
-            print(f"[visual_identity_agent] Concept {i + 1} exception: {result}")
-            final.append({**concepts[i], "svg": _placeholder(concepts[i]["number"], concepts[i]["name"])})
-        else:
+    for i, concept in enumerate(concepts):
+        print(f"[visual_identity_agent] Generating SVG {i + 1}/{len(concepts)}: {concept.get('name', '')}")
+        try:
+            result = await _generate_one(concept)
             final.append(result)
+        except Exception as exc:
+            print(f"[visual_identity_agent] Concept {i + 1} exception: {exc}")
+            final.append({**concept, "svg": _placeholder(concept["number"], concept["name"])})
 
     svg_ok = sum(1 for r in final if r.get("svg") and "SVG pending" not in r["svg"])
     print(f"[visual_identity_agent] SVGs: {svg_ok}/{len(final)} generated successfully")
