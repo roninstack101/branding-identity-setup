@@ -62,29 +62,28 @@ function ConceptCard({ concept, onClick }) {
 
   return (
     <div
-      className="rounded-2xl border overflow-hidden flex flex-col transition-all hover:scale-[1.01]"
+      className="rounded-2xl border overflow-hidden flex flex-col transition-all hover:scale-[1.01] cursor-pointer"
       style={{ borderColor: style.border, background: 'rgba(255,255,255,0.015)' }}
+      onClick={() => onClick(concept)}
     >
-      {/* SVG preview — click to open full-screen */}
-      <button
-        onClick={() => onClick(concept)}
-        className="w-full bg-white overflow-hidden flex items-center justify-center"
-        style={{ aspectRatio: '1 / 1' }}
-        title="Click to expand"
-      >
-        {concept.svg ? (
-          <img
-            src={svgToDataUrl(concept.svg)}
-            alt={concept.name}
-            className="w-full h-full object-contain"
-          />
-        ) : (
-          <div className="flex flex-col items-center justify-center gap-1 h-full w-full py-8">
-            <div className="text-2xl opacity-20">◻</div>
-            <div className="text-black/20 text-xs">No SVG</div>
-          </div>
-        )}
-      </button>
+      {/* SVG preview — padding-top trick for reliable 1:1 aspect ratio */}
+      <div className="relative w-full bg-white" style={{ paddingTop: '100%' }}>
+        <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+          {concept.svg ? (
+            <img
+              src={svgToDataUrl(concept.svg)}
+              alt={concept.name}
+              className="w-full h-full object-contain"
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-1">
+              <div className="text-3xl opacity-15">◻</div>
+              <div className="text-black/20 text-xs">No SVG</div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Card footer */}
       <div className="p-3 space-y-2" style={{ background: style.bg }}>
@@ -98,7 +97,7 @@ function ConceptCard({ concept, onClick }) {
 
           {hasSVG && (
             <button
-              onClick={(e) => { e.stopPropagation(); downloadSVG(concept.svg, filename); }}
+              onClick={(e) => { e.stopPropagation(); e.preventDefault(); downloadSVG(concept.svg, filename); }}
               className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all hover:opacity-90"
               style={{ background: style.border, color: style.color }}
               title="Download SVG"
