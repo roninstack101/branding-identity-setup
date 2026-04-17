@@ -49,6 +49,14 @@ class AgentOutputOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Logo Generation from Reference ───────────────────────────────────
+class LogoGenerateRequest(BaseModel):
+    project_id: UUID
+    reference_url: Optional[str] = None
+    user_prompt: str = Field(default="", max_length=2000)
+    concept_number: int = Field(default=1, ge=1, le=10)
+
+
 # ── Regeneration Request ──────────────────────────────────────────────
 class RegenerateRequest(BaseModel):
     project_id: UUID

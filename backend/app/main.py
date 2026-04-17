@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 
 from app.db.database import init_db
 from app.api.brand import router as brand_router
+from app.api.logo_generate import router as logo_generate_router
 from app.api.regenerate import router as regenerate_router
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
@@ -59,6 +60,7 @@ app.mount("/logos", StaticFiles(directory=BACKEND_ROOT / "generated_logos"), nam
 
 # Register API routers
 app.include_router(brand_router)
+app.include_router(logo_generate_router)
 app.include_router(regenerate_router)
 
 

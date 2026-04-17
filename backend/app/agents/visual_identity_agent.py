@@ -1,221 +1,31 @@
 """
-Agent 6 – Visual Identity Intelligence Agent (v5)
+Agent 6 – Visual Identity Intelligence Agent (v6)
 
 Pipeline:
   1. Gemini (+ Google Search) — researches competitors, generates brand-tailored
-     10-concept logo design brief using the industry-standard template.
-  2. Python deterministic SVG renderer — builds pixel-perfect SVG for each archetype
-     using brand colours from the brief. No LLM SVG generation — always correct output.
-  3. Inspiration links collected in parallel.
+     10-concept logo design brief with rich visual_concept descriptions.
+  2. Inspiration links collected from visual-keyword-based searches.
+
+SVG/image generation is no longer done here — the frontend LogoGenerator
+panel lets the user paste a reference image URL + prompt, and the
+/api/logo/generate endpoint uses gpt-image-1 to produce a brand-specific
+logo image from that reference.
 
 Output data keys:
-  design_concepts     – list of 10 dicts, each with "svg" field (self-contained SVG string)
+  design_concepts     – list of 10 dicts with visual_concept descriptions (no SVG)
   logo_design_brief   – full text brief from Gemini
   competitor_visual_notes
   primary_color / accent_color / neutral_dark / font / style_descriptors / symbol_concepts
   logo_inspiration    – curated designer reference links
 """
 import json
-import math
 import re
 from urllib.parse import quote_plus, urlparse
 
 from app.schemas.brand_schema import AgentResult
 from app.utils.gemini_search import call_gemini_with_search
-from app.utils.llm import call_llm, call_openai
+from app.utils.llm import call_llm
 from app.utils.search import web_search
-
-
-# ── Deterministic SVG symbol builders (one per archetype) ─────────────────────
-# These always produce pixel-perfect, professional SVGs — no LLM involved.
-# Canvas: 400×400. Symbol area: x 60-340, y 30-270. Wordmark below y=283.
-
-def _xe(s: str) -> str:
-    """XML-escape text for safe embedding in SVG."""
-    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
-
-
-def _sym_monogram(P: str, A: str, abbr: str) -> str:
-    """Two interlocked L-bracket forms creating a unified square-frame mark."""
-    L = _xe(abbr[0]) if abbr else "M"
-    return (
-        # Primary: top + left arms
-        f'<rect x="118" y="58" width="20" height="192" rx="4" fill="{P}"/>'
-        f'<rect x="118" y="58" width="118" height="20" rx="4" fill="{P}"/>'
-        # Accent: bottom + right arms
-        f'<rect x="262" y="58" width="20" height="192" rx="4" fill="{A}"/>'
-        f'<rect x="164" y="230" width="118" height="20" rx="4" fill="{A}"/>'
-        # Subtle centre crossbar (primary)
-        f'<rect x="118" y="148" width="164" height="12" rx="3" fill="{P}" opacity="0.18"/>'
-        # Ghost initial watermark
-        f'<text x="200" y="200" text-anchor="middle" dominant-baseline="middle"'
-        f' font-family="Arial,Helvetica,sans-serif" font-size="80" font-weight="900"'
-        f' fill="{P}" opacity="0.05">{L}</text>'
-    )
-
-
-def _sym_orbit(P: str, A: str) -> str:
-    """Central hub circle with orbit ring and three satellite nodes."""
-    cx, cy, ro = 200, 152, 90
-    # satellites at −90°(top), 210°(lower-left), 330°(lower-right)
-    s = [(cx + ro * math.cos(math.radians(a)), cy + ro * math.sin(math.radians(a)))
-         for a in (-90, 210, 330)]
-    return (
-        f'<circle cx="{cx}" cy="{cy}" r="{ro}" stroke="{P}" stroke-width="3" fill="none"/>'
-        f'<circle cx="{s[0][0]:.1f}" cy="{s[0][1]:.1f}" r="12" fill="{P}"/>'
-        f'<circle cx="{s[1][0]:.1f}" cy="{s[1][1]:.1f}" r="12" fill="{P}"/>'
-        f'<circle cx="{s[2][0]:.1f}" cy="{s[2][1]:.1f}" r="14" fill="{A}"/>'
-        f'<circle cx="{cx}" cy="{cy}" r="40" fill="{P}"/>'
-    )
-
-
-def _sym_growth(P: str, A: str) -> str:
-    """Five ascending bars — tallest in accent, rounded tops."""
-    base = 262
-    specs = [(108, 78, P), (148, 108, P), (188, 140, P), (228, 168, P), (268, 200, A)]
-    return "".join(
-        f'<rect x="{x}" y="{base - h}" width="28" height="{h}" rx="5" fill="{c}"/>'
-        for x, h, c in specs
-    )
-
-
-def _sym_bridge(P: str, A: str) -> str:
-    """Arch with two pylons, horizontal base, accent spring-point dots."""
-    return (
-        f'<path d="M 80,222 Q 200,60 320,222" stroke="{P}" stroke-width="9"'
-        f' fill="none" stroke-linecap="round"/>'
-        f'<rect x="71" y="222" width="18" height="40" rx="4" fill="{P}"/>'
-        f'<rect x="311" y="222" width="18" height="40" rx="4" fill="{P}"/>'
-        f'<rect x="62" y="258" width="276" height="12" rx="4" fill="{P}"/>'
-        f'<circle cx="80" cy="222" r="11" fill="{A}"/>'
-        f'<circle cx="320" cy="222" r="11" fill="{A}"/>'
-    )
-
-
-def _sym_triform(P: str, A: str) -> str:
-    """Three overlapping circles in equilateral triangle — stroke + subtle fill."""
-    return (
-        f'<circle cx="200" cy="88"  r="74" stroke="{P}" stroke-width="5"'
-        f' fill="{P}" fill-opacity="0.07"/>'
-        f'<circle cx="148" cy="190" r="74" stroke="{A}" stroke-width="5"'
-        f' fill="{A}" fill-opacity="0.07"/>'
-        f'<circle cx="252" cy="190" r="74" stroke="{P}" stroke-width="3"'
-        f' fill="{P}" fill-opacity="0.04" opacity="0.55"/>'
-    )
-
-
-def _sym_network(P: str, A: str) -> str:
-    """Hub-and-spoke network: central accent node + six outer primary nodes."""
-    cx, cy, ro = 200, 152, 88
-    outer = [(cx + ro * math.cos(math.radians(a)), cy + ro * math.sin(math.radians(a)))
-             for a in range(0, 360, 60)]
-    spokes = "".join(
-        f'<line x1="{cx}" y1="{cy}" x2="{ox:.1f}" y2="{oy:.1f}"'
-        f' stroke="{P}" stroke-width="2" opacity="0.35"/>'
-        for ox, oy in outer
-    )
-    # Adjacent cross-links (every other pair)
-    links = "".join(
-        f'<line x1="{outer[i][0]:.1f}" y1="{outer[i][1]:.1f}"'
-        f' x2="{outer[(i+2)%6][0]:.1f}" y2="{outer[(i+2)%6][1]:.1f}"'
-        f' stroke="{P}" stroke-width="1" opacity="0.18"/>'
-        for i in range(0, 6, 2)
-    )
-    nodes = "".join(
-        f'<circle cx="{ox:.1f}" cy="{oy:.1f}" r="10" fill="{P}"/>'
-        for ox, oy in outer
-    )
-    hub = f'<circle cx="{cx}" cy="{cy}" r="24" fill="{A}"/>'
-    return spokes + links + nodes + hub
-
-
-def _sym_sweep(P: str, A: str) -> str:
-    """Bold diagonal slash parallelogram with accent punctuation circle."""
-    return (
-        f'<path d="M 72,252 L 150,252 L 328,70 L 328,103 L 178,252 Z" fill="{P}"/>'
-        f'<circle cx="317" cy="86" r="21" fill="{A}"/>'
-    )
-
-
-def _sym_grid(P: str, A: str) -> str:
-    """4×4 pixel grid with a distinctive primary/accent colour pattern."""
-    sq, gap, sx, sy = 28, 10, 129, 82
-    pattern = [
-        [P,    None, P,    A   ],
-        [None, P,    A,    None],
-        [A,    None, P,    P   ],
-        [P,    A,    None, P   ],
-    ]
-    out = ""
-    for ri, row in enumerate(pattern):
-        for ci, col in enumerate(row):
-            x = sx + ci * (sq + gap)
-            y = sy + ri * (sq + gap)
-            if col:
-                out += f'<rect x="{x}" y="{y}" width="{sq}" height="{sq}" rx="5" fill="{col}"/>'
-            else:
-                out += (
-                    f'<rect x="{x}" y="{y}" width="{sq}" height="{sq}" rx="5"'
-                    f' stroke="{P}" stroke-width="1.5" fill="none" opacity="0.22"/>'
-                )
-    return out
-
-
-def _sym_globe(P: str, A: str) -> str:
-    """Globe outline with latitude lines (clipPath) and accent orbital ring."""
-    return (
-        '<defs><clipPath id="gc"><circle cx="200" cy="148" r="98"/></clipPath></defs>'
-        f'<circle cx="200" cy="148" r="100" stroke="{P}" stroke-width="3.5" fill="none"/>'
-        f'<g clip-path="url(#gc)">'
-        f'<line x1="60" y1="115" x2="340" y2="115" stroke="{P}" stroke-width="1.5" opacity="0.45"/>'
-        f'<line x1="60" y1="148" x2="340" y2="148" stroke="{P}" stroke-width="1.5" opacity="0.45"/>'
-        f'<line x1="60" y1="181" x2="340" y2="181" stroke="{P}" stroke-width="1.5" opacity="0.45"/>'
-        f'<line x1="200" y1="48"  x2="200" y2="248" stroke="{P}" stroke-width="1.5" opacity="0.45"/>'
-        '</g>'
-        f'<ellipse cx="200" cy="148" rx="132" ry="32" stroke="{A}" stroke-width="3.5"'
-        f' fill="none" transform="rotate(-22 200 148)"/>'
-        f'<circle cx="272" cy="116" r="9" fill="{A}"/>'
-    )
-
-
-def _sym_swoosh(P: str, A: str) -> str:
-    """Smooth bezier swoosh from origin to destination, with accent dot."""
-    return (
-        f'<path d="M 68,268 C 92,202 188,148 318,95"'
-        f' stroke="{P}" stroke-width="8" fill="none" stroke-linecap="round"/>'
-        f'<circle cx="318" cy="95"  r="23" fill="{A}"/>'
-        f'<circle cx="68"  cy="268" r="11" fill="{P}" opacity="0.4"/>'
-    )
-
-
-# ── Fallback: rotate through geometric templates by concept index ─────────────
-_FALLBACK_BUILDERS = [
-    lambda P, A, ab: _sym_monogram(P, A, ab),  # monogram uses abbreviation
-    lambda P, A, _:  _sym_orbit(P, A),
-    lambda P, A, _:  _sym_growth(P, A),
-    lambda P, A, _:  _sym_bridge(P, A),
-    lambda P, A, _:  _sym_triform(P, A),
-    lambda P, A, _:  _sym_network(P, A),
-    lambda P, A, _:  _sym_sweep(P, A),
-    lambda P, A, _:  _sym_grid(P, A),
-    lambda P, A, _:  _sym_globe(P, A),
-    lambda P, A, _:  _sym_swoosh(P, A),
-]
-
-
-def _build_fallback_svg(
-    concept_num: int,
-    brand_name: str,
-    abbreviation: str,
-    concept_name: str,
-    primary: str,
-    accent: str,
-) -> str:
-    """Fallback SVG when GPT-4o fails — picks a distinct geometric mark by concept index."""
-    builder = _FALLBACK_BUILDERS[(concept_num - 1) % len(_FALLBACK_BUILDERS)]
-    sym = builder(primary, accent, abbreviation)
-    wm  = _wordmark(brand_name, abbreviation, concept_num, concept_name, primary, accent)
-    return _wrap_svg(sym, wm)
 
 # ── Gemini brief system prompt ─────────────────────────────────────────────────
 GEMINI_BRIEF_SYSTEM = """You are a world-class brand identity director at Pentagram / Landor / Wolff Olins level.
@@ -439,151 +249,6 @@ async def _collect_inspiration_links(industry: str, concepts: list[dict]) -> lis
     return all_links[:35]
 
 
-# ── GPT-4o symbol prompt ──────────────────────────────────────────────────────
-_SYMBOL_SYSTEM = """\
-You are a world-class SVG logo designer. Generate ONLY the inner SVG shape elements for a logo symbol mark.
-
-STRICT OUTPUT RULES:
-- Return ONLY SVG elements — NO full <svg> wrapper, NO <defs>, NO <style>, NO <text>
-- Allowed tags: rect, circle, ellipse, path, polygon, polyline, line, g
-- All coordinates must stay within x:60–340, y:30–265 (center: x=200, y=148)
-- No JavaScript, no external refs, no event handlers, no clip-path ids
-- Attribute values must be valid SVG strings
-- Create 4–10 shapes that clearly express the visual approach
-- The mark should be minimal, geometric, and professional
-
-Return nothing except the raw SVG element(s). No explanation, no markdown."""
-
-_SYMBOL_USER_TMPL = """\
-Brand: {brand} ({abbr})
-Tagline: "{tagline}"
-Concept: {name}
-Visual concept: {visual_concept}
-Creative rationale: {rationale}
-Primary colour: {primary}
-Accent colour: {accent}
-
-Translate the visual concept above into SVG elements for {brand}.
-Express the described shapes and metaphor through minimal, geometric forms.
-Primary colour {primary} for main forms. Accent colour {accent} for highlights."""
-
-
-def _extract_svg_elements(raw: str) -> str:
-    """Strip any accidental <svg> wrapper or markdown fences, return inner elements only."""
-    if not raw:
-        return ""
-    # Strip markdown fences
-    raw = re.sub(r"```[a-z]*\n?", "", raw).strip()
-    # If there's a full <svg>…</svg>, extract inner content
-    inner = re.search(r"<svg[^>]*>([\s\S]*?)</svg>", raw, re.IGNORECASE)
-    if inner:
-        raw = inner.group(1).strip()
-    # Remove any <defs>, <style>, <text> blocks
-    raw = re.sub(r"<defs[\s\S]*?</defs>", "", raw, flags=re.IGNORECASE)
-    raw = re.sub(r"<style[\s\S]*?</style>", "", raw, flags=re.IGNORECASE)
-    raw = re.sub(r"<text[\s\S]*?</text>", "", raw, flags=re.IGNORECASE)
-    # Remove script tags and event handlers
-    raw = re.sub(r"<script[\s\S]*?</script>", "", raw, flags=re.IGNORECASE)
-    raw = re.sub(r'\s+on\w+="[^"]*"', "", raw)
-    # Keep only lines that look like SVG elements
-    lines = [l for l in raw.splitlines() if l.strip() and not l.strip().startswith("<!--")]
-    return "\n".join(lines).strip()
-
-
-def _wordmark(brand_name: str, abbreviation: str, concept_num: int, concept_name: str,
-              primary: str, accent: str) -> str:
-    bn = _xe(brand_name)
-    ab = _xe(abbreviation)
-    cn = _xe(concept_name).upper()
-    return (
-        f'<line x1="60" y1="283" x2="340" y2="283" stroke="#e5e7eb" stroke-width="1"/>'
-        f'<text x="200" y="316" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"'
-        f' font-size="26" font-weight="700" fill="{primary}">{bn}</text>'
-        f'<text x="200" y="346" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"'
-        f' font-size="11" font-weight="600" letter-spacing="5" fill="{accent}">{ab}</text>'
-        f'<text x="200" y="383" text-anchor="middle" font-family="Arial,Helvetica,sans-serif"'
-        f' font-size="9" fill="#9ca3af">{concept_num}. {cn}</text>'
-    )
-
-
-def _wrap_svg(symbol: str, wm: str) -> str:
-    return (
-        '<svg viewBox="0 0 400 400" width="400" height="400" xmlns="http://www.w3.org/2000/svg">'
-        '<rect width="400" height="400" fill="white"/>'
-        f'{symbol}'
-        f'{wm}'
-        '</svg>'
-    )
-
-
-# ── SVG generation — GPT-4o symbol + deterministic wordmark ───────────────────
-async def _generate_concept_svgs(
-    brand_name: str,
-    abbreviation: str,
-    tagline: str,
-    concepts: list[dict],
-    primary_color: str,
-    accent_color: str,
-) -> list[dict]:
-    """
-    For each concept:
-      1. Ask GPT-4o to generate brand-specific symbol SVG elements.
-      2. Combine with deterministic wordmark section.
-      3. Fall back to pre-built geometric template if GPT-4o fails.
-    Runs sequentially — quality over speed.
-    """
-    final: list[dict] = []
-
-    for i, concept in enumerate(concepts):
-        palette   = concept.get("palette", [])
-        c_primary = palette[0] if palette else primary_color
-        c_accent  = palette[1] if len(palette) > 1 else accent_color
-
-        num           = concept.get("number", i + 1)
-        name          = concept.get("name", "")
-        visual_concept = concept.get("visual_concept", "")
-        rationale     = concept.get("rationale", "")
-
-        print(f"[visual_identity_agent] SVG {i+1}/{len(concepts)}: {name}")
-
-        wm  = _wordmark(brand_name, abbreviation, num, name, c_primary, c_accent)
-        sym = ""
-
-        # ── Attempt: GPT-4o brand-specific symbol ────────────────────────────
-        try:
-            user_prompt = _SYMBOL_USER_TMPL.format(
-                brand=brand_name, abbr=abbreviation, tagline=tagline,
-                visual_concept=visual_concept, name=name,
-                rationale=rationale,
-                primary=c_primary, accent=c_accent,
-            )
-            raw = await call_openai(
-                system_prompt=_SYMBOL_SYSTEM,
-                user_prompt=user_prompt,
-                model="gpt-4o",
-                temperature=0.6,
-                max_tokens=1200,
-                json_mode=False,
-            )
-            sym = _extract_svg_elements(raw)
-        except Exception as exc:
-            print(f"[visual_identity_agent] GPT-4o failed for concept {num}: {exc}")
-
-        # ── Fallback: geometric template (concept-index based) ───────────────
-        if not sym or len(sym) < 40:
-            print(f"[visual_identity_agent] Using geometric fallback for concept {num}")
-            fallback_svg = _build_fallback_svg(
-                concept_num=num, brand_name=brand_name, abbreviation=abbreviation,
-                concept_name=name, primary=c_primary, accent=c_accent,
-            )
-            final.append({**concept, "svg": fallback_svg})
-            continue
-
-        final.append({**concept, "svg": _wrap_svg(sym, wm)})
-
-    ai_ok = sum(1 for c in final if c.get("svg") and "SVG pending" not in c["svg"])
-    print(f"[visual_identity_agent] SVGs complete: {ai_ok}/{len(final)}")
-    return final
 
 
 # ── regenerate_variant_svg kept for brand.py API ───────────────────────────────
@@ -716,23 +381,11 @@ async def run(
 
     print(f"[visual_identity_agent] Brief done — {len(concepts)} concepts, colors: {primary_color} / {accent_color}")
 
-    # ── Step 2: Generate brand-specific SVGs (GPT-4o + deterministic fallback) ─
-    concepts_with_svg: list[dict] = []
-    if concepts:
-        print(f"[visual_identity_agent] Step 2 — generating {len(concepts)} brand-specific SVGs")
-        concepts_with_svg = await _generate_concept_svgs(
-            brand_name, abbreviation, tagline, concepts, primary_color, accent_color
-        )
-    else:
-        print("[visual_identity_agent] No concepts — skipping SVG generation")
-
-    # ── Step 3: Inspiration links ─────────────────────────────────────────────
+    # ── Step 2: Inspiration links ─────────────────────────────────────────────
     inspiration_links = await _collect_inspiration_links(industry, concepts)
 
-    svg_count = sum(1 for c in concepts_with_svg if c.get("svg") and "SVG pending" not in c["svg"])
-
     data: dict = {
-        "design_concepts":         concepts_with_svg,
+        "design_concepts":         concepts,
         "logo_design_brief":       brief_text,
         "competitor_visual_notes": competitor_notes,
         "primary_color":           primary_color,
@@ -747,16 +400,16 @@ async def run(
         "logo_image_url":          "",
         "design_style":            archetype,
         "combined_summary": (
-            f"10-concept SVG logo brief for {brand_name} ({abbreviation}). "
-            f"{svg_count}/{len(concepts_with_svg)} SVGs generated. "
+            f"10-concept logo brief for {brand_name} ({abbreviation}). "
+            f"{len(concepts)} concepts ready. "
             f"{len(inspiration_links)} inspiration links."
         ),
     }
 
     explanation = (
         f"Visual identity for '{brand_name}': Gemini researched competitors and generated "
-        f"10 logo concepts covering all visual archetypes. "
-        f"{svg_count} downloadable SVGs generated. "
+        f"10 distinct logo concepts with visual descriptions. "
+        f"Use the Logo Generator panel to produce images from reference links. "
         f"{len(inspiration_links)} inspiration links collected."
     )
 

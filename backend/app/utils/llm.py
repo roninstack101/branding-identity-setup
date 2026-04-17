@@ -97,6 +97,82 @@ async def call_openai(
         return "" if not json_mode else "{}"
 
 
+async def generate_logo_from_reference(
+    brand_prompt: str,
+    reference_url: str | None = None,
+) -> dict:
+    """
+    Generate a logo image using a brand prompt, optionally guided by a reference image URL.
+    - If reference_url is given: downloads the image and uses gpt-image-1 edit endpoint.
+    - Falls back to gpt-image-1 / dall-e-3 generation-only if edit fails or no reference.
+    Returns {"b64_json": ..., "model": ..., "error": ...}
+    """
+    if not os.getenv("OPENAI_API_KEY", "").strip():
+        return {"error": "OPENAI_API_KEY not set"}
+
+    # ── Attempt 1: gpt-image-1 edit with reference image ──────────────────────
+    if reference_url:
+        try:
+            import httpx, io
+            async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+                r = await client.get(reference_url)
+                r.raise_for_status()
+                image_bytes = r.content
+                ct = r.headers.get("content-type", "image/png")
+
+            ext = "jpg" if ("jpeg" in ct or "jpg" in ct) else ("webp" if "webp" in ct else "png")
+            buf = io.BytesIO(image_bytes)
+            buf.name = f"reference.{ext}"
+
+            response = await _openai_client.images.edit(
+                model="gpt-image-1",
+                image=buf,
+                prompt=brand_prompt,
+                n=1,
+                size="1024x1024",
+            )
+            b64 = getattr(response.data[0], "b64_json", None)
+            if b64:
+                print("[LogoGen] Generated with gpt-image-1 edit + reference")
+                return {"b64_json": b64, "model": "gpt-image-1-edit"}
+        except Exception as exc:
+            print(f"[LogoGen] gpt-image-1 edit failed: {type(exc).__name__}: {str(exc)[:200]}")
+
+    # ── Attempt 2: gpt-image-1 generation (no reference) ─────────────────────
+    try:
+        response = await _openai_client.images.generate(
+            model="gpt-image-1",
+            prompt=brand_prompt,
+            n=1,
+            size="1024x1024",
+        )
+        b64 = getattr(response.data[0], "b64_json", None)
+        if b64:
+            print("[LogoGen] Generated with gpt-image-1 (no reference)")
+            return {"b64_json": b64, "model": "gpt-image-1"}
+    except Exception as exc:
+        print(f"[LogoGen] gpt-image-1 generate failed: {type(exc).__name__}: {str(exc)[:200]}")
+
+    # ── Attempt 3: dall-e-3 fallback ──────────────────────────────────────────
+    try:
+        response = await _openai_client.images.generate(
+            model="dall-e-3",
+            prompt=brand_prompt[:4000],
+            n=1,
+            size="1024x1024",
+            quality="hd",
+            response_format="b64_json",
+        )
+        b64 = getattr(response.data[0], "b64_json", None)
+        if b64:
+            print("[LogoGen] Generated with dall-e-3")
+            return {"b64_json": b64, "model": "dall-e-3"}
+    except Exception as exc:
+        print(f"[LogoGen] dall-e-3 failed: {type(exc).__name__}: {str(exc)[:200]}")
+
+    return {"error": "Logo generation failed — check API key tier and logs"}
+
+
 async def generate_logo_image(prompt: str) -> dict:
     """
     Generate a logo concepts grid image.
