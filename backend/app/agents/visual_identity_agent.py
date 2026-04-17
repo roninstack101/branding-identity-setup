@@ -306,6 +306,37 @@ def _category_from_platform(platform: str) -> str:
     return "Reference"
 
 
+_VISUAL_STOP = {
+    "a", "an", "the", "and", "or", "of", "to", "in", "for", "with", "as", "at",
+    "by", "from", "on", "are", "is", "be", "been", "that", "this", "they", "it",
+    "its", "has", "have", "which", "each", "their", "into", "between", "through",
+    "around", "above", "below", "left", "right", "both", "where", "while", "when",
+    "also", "very", "more", "two", "three", "four", "five", "six", "one", "upon",
+    "creating", "suggesting", "expressing", "representing", "forming", "using",
+    "gives", "give", "make", "creates", "create", "together", "overall",
+}
+
+
+def _visual_keywords(visual_concept: str, name: str) -> list[str]:
+    """
+    Extract 3-4 searchable visual shape/metaphor keywords from a concept.
+    Pulls from the concept name + first two sentences of visual_concept.
+    """
+    first_two = ". ".join(visual_concept.split(".")[:2]) if visual_concept else ""
+    text = f"{name} {first_two}"
+    words = re.findall(r"\b[a-zA-Z]{4,}\b", text)
+    seen_kw: set[str] = set()
+    result: list[str] = []
+    for w in words:
+        lw = w.lower()
+        if lw not in _VISUAL_STOP and lw not in seen_kw:
+            seen_kw.add(lw)
+            result.append(lw)
+        if len(result) >= 4:
+            break
+    return result
+
+
 async def _collect_inspiration_links(industry: str, concepts: list[dict]) -> list[dict]:
     import asyncio
 
@@ -317,18 +348,42 @@ async def _collect_inspiration_links(industry: str, concepts: list[dict]) -> lis
             seen.add(query)
             search_plan.append({"label": label, "query": query, "reason": reason, "category": category})
 
-    _plan("Behance",          f"site:behance.net {industry} brand identity logo case study", "Brand identity case studies", "Case Studies")
-    _plan("Brand New",        f"site:underconsideration.com/brandnew {industry} brand identity", "Professional brand critique", "Case Studies")
-    _plan("Logopond",         f"site:logopond.com {industry} logo", "Curated logo gallery", "Logo Gallery")
-    _plan("Logolounge",       f"site:logolounge.com {industry} logo trend", "Annual logo trends", "Logo Gallery")
-    _plan("Dribbble – Logos", f"site:dribbble.com {industry} logo brand identity", "Logo explorations", "Design Shots")
-    _plan("Fonts In Use",     f"site:fontsinuse.com {industry} brand logo", "Real brand typeface usage", "Typography")
-    _plan("Pinterest",        f"site:pinterest.com {industry} logo brand identity inspiration", "Visual mood boards", "Moodboard")
+    # ── Base industry searches (platform variety) ─────────────────────────────
+    _plan("Behance – Industry",  f"site:behance.net {industry} brand identity logo case study", "Brand identity case studies", "Case Studies")
+    _plan("Brand New",           f"site:underconsideration.com/brandnew {industry} brand identity", "Professional brand critique", "Case Studies")
+    _plan("Logolounge",          f"site:logolounge.com {industry} logo trend", "Annual logo trends", "Logo Gallery")
+    _plan("Fonts In Use",        f"site:fontsinuse.com {industry} brand logo", "Real brand typeface usage", "Typography")
+    _plan("Pinterest – Brand",   f"site:pinterest.com {industry} logo brand identity inspiration", "Visual mood boards", "Moodboard")
 
-    for c in concepts[:3]:
-        concept_name = c.get("name", "").split("/")[0].strip()
-        if concept_name:
-            _plan(f"Dribbble – {concept_name}", f"site:dribbble.com {concept_name} logo {industry}", f"Shots for {concept_name}", "Design Shots")
+    # ── Per-concept: search by visual keywords extracted from visual_concept ──
+    # These make the inspiration resonate with what's actually being drawn.
+    for c in concepts[:5]:
+        name    = c.get("name", "").strip()
+        vc      = c.get("visual_concept", "")
+        kws     = _visual_keywords(vc, name)
+        if not kws:
+            continue
+        kw2 = " ".join(kws[:2])   # e.g. "converging curves"
+        kw3 = " ".join(kws[:3])   # e.g. "converging curves rising"
+
+        _plan(
+            f"Dribbble – {name}",
+            f"site:dribbble.com {kw2} logo brand identity",
+            f"Visual inspiration matching '{kw2}' shapes in concept '{name}'",
+            "Design Shots",
+        )
+        _plan(
+            f"Behance – {name}",
+            f"site:behance.net {kw3} logo branding",
+            f"Case study with '{kw3}' visual language for concept '{name}'",
+            "Case Studies",
+        )
+        _plan(
+            f"Logopond – {name}",
+            f"site:logopond.com {kw2} logo",
+            f"Logo gallery matching '{kw2}' for concept '{name}'",
+            "Logo Gallery",
+        )
 
     async def _fetch(p: dict) -> list[dict]:
         results = await web_search(p["query"], num_results=4)
@@ -343,7 +398,8 @@ async def _collect_inspiration_links(industry: str, concepts: list[dict]) -> lis
                              "reason": p["reason"]})
         return out
 
-    batches = await asyncio.gather(*[_fetch(p) for p in search_plan[:14]], return_exceptions=True)
+    # Cap to 20 queries: 5 base + up to 15 per-concept (5 concepts × 3 queries)
+    batches = await asyncio.gather(*[_fetch(p) for p in search_plan[:20]], return_exceptions=True)
 
     seen_links: set[str] = set()
     all_links: list[dict] = []
@@ -358,10 +414,21 @@ async def _collect_inspiration_links(industry: str, concepts: list[dict]) -> lis
     order = {"Case Studies": 0, "Logo Gallery": 1, "Design Shots": 2, "Typography": 3, "Moodboard": 4, "Reference": 5}
     all_links.sort(key=lambda x: order.get(x.get("category", "Reference"), 5))
 
+    # Attach concept context to each link so the frontend can group/label them
+    for c in concepts[:5]:
+        name = c.get("name", "")
+        kws  = _visual_keywords(c.get("visual_concept", ""), name)
+        for link in all_links:
+            ql = link.get("query_label", "")
+            if name and name in ql:
+                link["concept_name"]  = name
+                link["visual_keywords"] = " · ".join(kws)
+
+    # Static fallback links if search returned nothing useful
     for plat, url, cat, reason in [
         ("Brand New", "https://www.underconsideration.com/brandnew/", "Case Studies", "Brand identity reviews"),
         ("Logopond", f"https://logopond.com/?filter={quote_plus(industry)}", "Logo Gallery", f"{industry} logos"),
-        ("Dribbble", f"https://dribbble.com/search/{quote_plus(industry + ' logo')}", "Design Shots", f"{industry} logo shots"),
+        ("Dribbble",  f"https://dribbble.com/search/{quote_plus(industry + ' logo')}", "Design Shots", f"{industry} logo shots"),
     ]:
         if not any(e["link"] == url for e in all_links):
             all_links.append({"title": f"{plat}: {industry}", "brand_name": plat, "link": url,
@@ -369,7 +436,7 @@ async def _collect_inspiration_links(industry: str, concepts: list[dict]) -> lis
                                "category": cat, "reason": reason})
 
     print(f"[visual_identity_agent] Inspiration: {len(all_links)} links")
-    return all_links[:30]
+    return all_links[:35]
 
 
 # ── GPT-4o symbol prompt ──────────────────────────────────────────────────────
