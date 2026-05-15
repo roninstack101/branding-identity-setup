@@ -269,6 +269,7 @@ export default function AgentCard({ agentName, output, onRegenerate, isExpanded,
       {/* Expandable Content */}
       {isExpanded && (
         <div className="border-t border-white/5 animate-fade-in">
+          {agentName !== 'export_agent' && (
           <div className="px-6 pt-5 pb-2">
             <div className="flex flex-wrap gap-2">
               {[
@@ -290,7 +291,9 @@ export default function AgentCard({ agentName, output, onRegenerate, isExpanded,
               ))}
             </div>
           </div>
+          )}
 
+          {agentName !== 'export_agent' && (
           <div className="px-6 py-4">
             <div className="bg-white/[0.02] rounded-2xl p-5 max-h-[540px] overflow-y-auto border border-white/5 shadow-inner space-y-5">
               {activeTab === 'highlights' && (
@@ -354,6 +357,7 @@ export default function AgentCard({ agentName, output, onRegenerate, isExpanded,
               )}
             </div>
           </div>
+          )}
 
           {/* Regenerate Action Area */}
           {canRegenerate && onRegenerate && (

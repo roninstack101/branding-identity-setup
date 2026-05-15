@@ -40,10 +40,7 @@ Your output must be a JSON object with EXACTLY these keys:
     ],
     "example_hero_copy": "A full sample paragraph (3-4 sentences) written in brand voice — as if this is the homepage hero. Show, don't just tell."
   },
-  "email_signature": {
-    "tagline": "A clever one-line sign-off that reinforces the brand promise (a sign-off variant, not the main tagline).",
-    "template": "[Full Name]\\n[Job Title] | [Brand Name]\\n[tagline]\\n[Website] | [Email] | [Phone]"
-  },
+  "email_tagline": "A clever one-line sign-off for email signatures that reinforces the brand promise. Should feel like a natural extension of the brand voice — not the main tagline, but a complementary sign-off.",
   "social_media_bios": {
     "twitter": "Hook-driven bio under 280 characters with brand personality.",
     "instagram": "Punchy emoji-enhanced bio under 150 characters with a clear CTA.",
@@ -57,8 +54,7 @@ Your output must be a JSON object with EXACTLY these keys:
     }
   ],
   "call_to_action_phrases": ["Urgent CTA", "Value-driven CTA", "Curiosity-driven CTA", "Soft CTA"],
-  "brand_hashtags": ["#uniquebrandtag", "#industrytag", "#communitytag"],
-  "email_signature_tagline": "Same as email_signature.tagline — kept for legacy compatibility."
+  "brand_hashtags": ["#uniquebrandtag", "#industrytag", "#communitytag"]
 }
 
 Return ONLY valid JSON. Avoid generic corporate jargon. Every line should sound like it could ONLY belong to this brand."""
@@ -91,9 +87,9 @@ async def run(
 
     data = json.loads(raw)
 
-    # Back-fill email_signature_tagline from nested object if absent
+    # Back-fill legacy key from new field
     if not data.get("email_signature_tagline"):
-        data["email_signature_tagline"] = (data.get("email_signature") or {}).get("tagline", "")
+        data["email_signature_tagline"] = data.get("email_tagline", "")
 
     pillars = data.get("key_messaging_pillars", [])
     tov     = data.get("tone_of_voice", {})

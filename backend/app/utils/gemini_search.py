@@ -13,7 +13,7 @@ from google.genai import types
 
 load_dotenv()
 
-_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+_GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")
 
 
 def _get_client() -> genai.Client:

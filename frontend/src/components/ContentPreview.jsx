@@ -188,30 +188,20 @@ function VoiceTab({ data }) {
 }
 
 function EmailTab({ data }) {
-  const sig = data.email_signature || {};
-  const tagline  = sig.tagline  || data.email_signature_tagline || '';
-  const template = sig.template || '';
+  const tagline = data.email_tagline || data.email_signature_tagline || '';
 
   return (
     <div className="space-y-4">
-      {tagline && (
+      {tagline ? (
         <Block label="Email Sign-off Tagline" text={tagline} accent="violet">
-          <p className="text-white/85 text-lg font-medium italic">"{tagline}"</p>
+          <p className="text-white/90 text-xl font-medium italic leading-relaxed">"{tagline}"</p>
+          <p className="text-[11px] text-white/35 mt-2">
+            Use this as the closing line in all staff email signatures — consistent across the team.
+          </p>
         </Block>
+      ) : (
+        <p className="text-white/30 text-sm">No email tagline generated yet.</p>
       )}
-      {template && (
-        <Block label="Signature Template" text={template} accent="indigo">
-          <pre className="text-white/70 text-sm leading-relaxed font-mono whitespace-pre-wrap bg-white/[0.03] rounded-xl px-4 py-3 border border-white/6">
-            {template}
-          </pre>
-        </Block>
-      )}
-      <div className="rounded-xl border border-white/6 bg-white/[0.02] p-4">
-        <div className="text-[10px] text-white/25 uppercase tracking-widest mb-2">Usage Note</div>
-        <p className="text-[11px] text-white/40 leading-relaxed">
-          Replace placeholders in brackets with team member details. The tagline is a brand sign-off — keep it consistent across all staff.
-        </p>
-      </div>
     </div>
   );
 }
