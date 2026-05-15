@@ -9,6 +9,7 @@ import ContentPreview       from '../components/ContentPreview';
 import BrandStrategyView    from '../components/BrandStrategyView';
 import MarketResearchView   from '../components/MarketResearchView';
 import AgentCard            from '../components/AgentCard';
+import GuidelinesView       from '../components/GuidelinesView';
 
 const STEPS = [
   { key: 'idea_discovery',        icon: '💡', label: 'Idea Analysis' },
@@ -35,7 +36,8 @@ function renderAgentView(key, json, onRegenerate, projectId, agentOutputs) {
         <Moodboard      data={json} />
       </div>
     );
-    case 'content_agent':         return <ContentPreview data={json} onRegenerate={onRegenerate} />;
+    case 'content_agent':         return <ContentPreview  data={json} onRegenerate={onRegenerate} />;
+    case 'guidelines_agent':      return <GuidelinesView  data={json} />;
     default:                      return null;
   }
 }

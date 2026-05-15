@@ -7,11 +7,33 @@ function CopyButton({ text }) {
       onClick={() => { navigator.clipboard.writeText(text).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
       className="text-[10px] px-2 py-1 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white/40 hover:text-white/70 transition-all flex-shrink-0"
     >
-      {copied ? '✓' : 'Copy'}
+      {copied ? '✓ Copied' : 'Copy'}
     </button>
   );
 }
 
+// ── Block component: label + body + copy ─────────────────────────────────────
+function Block({ label, children, text, accent = 'cyan' }) {
+  const colours = {
+    cyan:    'text-cyan-300/70',
+    indigo:  'text-indigo-300/70',
+    emerald: 'text-emerald-300/70',
+    amber:   'text-amber-300/70',
+    rose:    'text-rose-300/70',
+    violet:  'text-violet-300/70',
+  };
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 space-y-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className={`text-[10px] font-black uppercase tracking-[0.2em] ${colours[accent] || colours.cyan}`}>{label}</div>
+        {text && <CopyButton text={text} />}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Social platform cards ─────────────────────────────────────────────────────
 function TwitterCard({ bio }) {
   return (
     <div className="rounded-2xl bg-black border border-white/10 p-5 space-y-3">
@@ -31,7 +53,6 @@ function TwitterCard({ bio }) {
         <p className="text-white/80 text-sm leading-relaxed">{bio}</p>
         <CopyButton text={bio} />
       </div>
-      <div className="text-[11px] text-white/30">Twitter / X · Bio preview</div>
     </div>
   );
 }
@@ -45,17 +66,11 @@ function InstagramCard({ bio }) {
           <div className="font-bold text-white text-sm">brand</div>
           <div className="text-white/40 text-xs">Instagram</div>
         </div>
-        <div className="ml-auto">
-          <svg className="w-5 h-5 text-white/60" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4z"/>
-          </svg>
-        </div>
       </div>
       <div className="flex items-start justify-between gap-3">
         <p className="text-white/80 text-sm leading-relaxed whitespace-pre-line">{bio}</p>
         <CopyButton text={bio} />
       </div>
-      <div className="text-[11px] text-white/30">Instagram · Bio preview</div>
     </div>
   );
 }
@@ -64,7 +79,7 @@ function LinkedInCard({ bio }) {
   return (
     <div className="rounded-2xl bg-[#0a66c2]/10 border border-[#0a66c2]/30 p-5 space-y-3">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-md bg-[#0a66c2] flex items-center justify-center font-black text-white text-sm">B</div>
+        <div className="w-10 h-10 rounded-md bg-[#0a66c2] flex items-center justify-center font-black text-white text-sm">in</div>
         <div>
           <div className="font-bold text-white text-sm">Brand Name</div>
           <div className="text-white/40 text-xs">Company · LinkedIn</div>
@@ -74,26 +89,222 @@ function LinkedInCard({ bio }) {
         <p className="text-white/80 text-sm leading-relaxed">{bio}</p>
         <CopyButton text={bio} />
       </div>
-      <div className="text-[11px] text-white/30">LinkedIn · Company bio preview</div>
     </div>
   );
 }
 
+// ── Tab content sections ──────────────────────────────────────────────────────
+
+function FoundationsTab({ data }) {
+  return (
+    <div className="space-y-4">
+      {data.mission_statement && (
+        <Block label="Mission Statement" text={data.mission_statement} accent="emerald">
+          <p className="text-white/90 text-base leading-relaxed font-medium">{data.mission_statement}</p>
+        </Block>
+      )}
+      {data.vision_statement && (
+        <Block label="Vision Statement" text={data.vision_statement} accent="indigo">
+          <p className="text-white/90 text-base leading-relaxed font-medium">{data.vision_statement}</p>
+        </Block>
+      )}
+      {data.brand_stands_for && (
+        <Block label="What We Stand For" text={data.brand_stands_for} accent="violet">
+          <p className="text-white/80 leading-relaxed">{data.brand_stands_for}</p>
+        </Block>
+      )}
+      {data.mission_statement_extended && (
+        <Block label="Extended Mission" text={data.mission_statement_extended} accent="cyan">
+          <p className="text-white/70 text-sm leading-relaxed">{data.mission_statement_extended}</p>
+        </Block>
+      )}
+    </div>
+  );
+}
+
+function VoiceTab({ data }) {
+  const tov = data.tone_of_voice || {};
+  const chars    = Array.isArray(tov.character)   ? tov.character   : [];
+  const writeLike = Array.isArray(tov.write_like) ? tov.write_like  : [];
+  const avoid    = Array.isArray(tov.avoid)        ? tov.avoid      : [];
+
+  return (
+    <div className="space-y-4">
+      {/* Character chips */}
+      {chars.length > 0 && (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 space-y-3">
+          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-300/70">Voice Character</div>
+          <div className="flex flex-wrap gap-2">
+            {chars.map((c, i) => (
+              <span key={i} className="px-3 py-1.5 rounded-full border border-amber-400/30 bg-amber-400/8 text-amber-200 text-xs font-bold">
+                {c}
+              </span>
+            ))}
+          </div>
+          {tov.description && <p className="text-white/70 text-sm leading-relaxed">{tov.description}</p>}
+        </div>
+      )}
+
+      {/* Hero copy example */}
+      {tov.example_hero_copy && (
+        <Block label="Sample Brand Voice (Homepage Hero)" text={tov.example_hero_copy} accent="cyan">
+          <p className="text-white/85 leading-relaxed italic border-l-2 border-cyan-400/30 pl-4">
+            "{tov.example_hero_copy}"
+          </p>
+        </Block>
+      )}
+
+      {/* Write like / Avoid */}
+      <div className="grid md:grid-cols-2 gap-4">
+        {writeLike.length > 0 && (
+          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5 space-y-3">
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300/70">Write Like This ✓</div>
+            <ul className="space-y-2">
+              {writeLike.map((ex, i) => (
+                <li key={i} className="flex gap-2 text-sm text-white/75 leading-relaxed">
+                  <span className="text-emerald-400 flex-shrink-0 mt-0.5">→</span>
+                  <span>"{ex}"</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {avoid.length > 0 && (
+          <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-5 space-y-3">
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-red-300/70">Avoid ✕</div>
+            <ul className="space-y-2">
+              {avoid.map((ex, i) => (
+                <li key={i} className="flex gap-2 text-sm text-white/65 leading-relaxed">
+                  <span className="text-red-400 flex-shrink-0 mt-0.5">✕</span>
+                  <span>{ex}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EmailTab({ data }) {
+  const sig = data.email_signature || {};
+  const tagline  = sig.tagline  || data.email_signature_tagline || '';
+  const template = sig.template || '';
+
+  return (
+    <div className="space-y-4">
+      {tagline && (
+        <Block label="Email Sign-off Tagline" text={tagline} accent="violet">
+          <p className="text-white/85 text-lg font-medium italic">"{tagline}"</p>
+        </Block>
+      )}
+      {template && (
+        <Block label="Signature Template" text={template} accent="indigo">
+          <pre className="text-white/70 text-sm leading-relaxed font-mono whitespace-pre-wrap bg-white/[0.03] rounded-xl px-4 py-3 border border-white/6">
+            {template}
+          </pre>
+        </Block>
+      )}
+      <div className="rounded-xl border border-white/6 bg-white/[0.02] p-4">
+        <div className="text-[10px] text-white/25 uppercase tracking-widest mb-2">Usage Note</div>
+        <p className="text-[11px] text-white/40 leading-relaxed">
+          Replace placeholders in brackets with team member details. The tagline is a brand sign-off — keep it consistent across all staff.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function PitchTab({ data }) {
+  return (
+    <div className="space-y-4">
+      {data.elevator_pitch && (
+        <Block label="Elevator Pitch" text={data.elevator_pitch} accent="cyan">
+          <p className="text-white/90 text-lg leading-relaxed font-medium">{data.elevator_pitch}</p>
+        </Block>
+      )}
+      {data.about_section && (
+        <Block label="About Section" text={data.about_section} accent="indigo">
+          <p className="text-white/80 leading-relaxed">{data.about_section}</p>
+        </Block>
+      )}
+    </div>
+  );
+}
+
+function SocialTab({ data }) {
+  const bios = data.social_media_bios || {};
+  const tags = Array.isArray(data.brand_hashtags) ? data.brand_hashtags : [];
+
+  return (
+    <div className="space-y-4">
+      {bios.twitter   && <TwitterCard   bio={bios.twitter}   />}
+      {bios.instagram && <InstagramCard bio={bios.instagram} />}
+      {bios.linkedin  && <LinkedInCard  bio={bios.linkedin}  />}
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          {tags.map((tag, i) => (
+            <span key={i} className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-sm font-semibold">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PillarsTab({ data }) {
+  const pillars = Array.isArray(data.key_messaging_pillars) ? data.key_messaging_pillars : [];
+  return (
+    <div className="grid md:grid-cols-2 gap-4">
+      {pillars.map((p, i) => (
+        <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 space-y-2">
+          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300/70">Pillar {i + 1}</div>
+          <div className="font-black text-white text-lg">{p.pillar}</div>
+          <div className="text-blue-300 font-semibold text-sm">{p.headline}</div>
+          <p className="text-white/60 text-sm leading-relaxed">{p.description}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CTAsTab({ data }) {
+  const ctas = Array.isArray(data.call_to_action_phrases) ? data.call_to_action_phrases : [];
+  return (
+    <div className="grid md:grid-cols-2 gap-3">
+      {ctas.map((cta, i) => (
+        <div key={i} className="rounded-xl border border-white/10 bg-white/[0.03] p-4 flex items-center justify-between gap-4">
+          <div>
+            <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1">CTA {i + 1}</div>
+            <div className="text-white/90 font-semibold">{cta}</div>
+          </div>
+          <CopyButton text={cta} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Main Export ───────────────────────────────────────────────────────────────
 export default function ContentPreview({ data, onRegenerate }) {
-  const [tab, setTab] = useState('social');
+  const [tab, setTab] = useState('foundations');
 
   if (!data) return null;
 
-  const bios    = data.social_media_bios || {};
   const pillars = Array.isArray(data.key_messaging_pillars) ? data.key_messaging_pillars : [];
   const ctas    = Array.isArray(data.call_to_action_phrases) ? data.call_to_action_phrases : [];
-  const tags    = Array.isArray(data.brand_hashtags) ? data.brand_hashtags : [];
 
   const tabs = [
-    { key: 'social',    label: 'Social Bios' },
-    { key: 'pitch',     label: 'Elevator Pitch' },
-    { key: 'pillars',   label: `Pillars (${pillars.length})` },
-    { key: 'cta',       label: 'CTAs' },
+    { key: 'foundations', label: 'Mission & Vision' },
+    { key: 'voice',       label: 'Tone of Voice' },
+    { key: 'email',       label: 'Email Signature' },
+    { key: 'pitch',       label: 'About & Pitch' },
+    { key: 'social',      label: 'Social Bios' },
+    { key: 'pillars',     label: `Pillars (${pillars.length})` },
+    { key: 'cta',         label: `CTAs (${ctas.length})` },
   ];
 
   return (
@@ -102,7 +313,7 @@ export default function ContentPreview({ data, onRegenerate }) {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-2xl font-black text-white uppercase tracking-tight">Brand Content</h2>
-          <p className="text-white/40 text-sm mt-1">Copy ready to publish across all channels</p>
+          <p className="text-white/40 text-sm mt-1">Mission, voice, copy — ready for every channel</p>
         </div>
         {onRegenerate && (
           <button
@@ -120,7 +331,7 @@ export default function ContentPreview({ data, onRegenerate }) {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-[0.15em] border transition-all ${
+            className={`px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-[0.12em] border transition-all ${
               tab === t.key
                 ? 'bg-blue-500/20 border-blue-400/40 text-blue-200'
                 : 'bg-white/5 border-white/10 text-white/50 hover:text-white/70'
@@ -131,85 +342,13 @@ export default function ContentPreview({ data, onRegenerate }) {
         ))}
       </div>
 
-      {/* Social Bios */}
-      {tab === 'social' && (
-        <div className="space-y-4">
-          {bios.twitter  && <TwitterCard   bio={bios.twitter}  />}
-          {bios.instagram && <InstagramCard bio={bios.instagram} />}
-          {bios.linkedin  && <LinkedInCard  bio={bios.linkedin}  />}
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-2">
-              {tags.map((tag, i) => (
-                <span key={i} className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-sm font-semibold">
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Elevator Pitch */}
-      {tab === 'pitch' && (
-        <div className="space-y-4">
-          {data.elevator_pitch && (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300/70">Elevator Pitch</div>
-                <CopyButton text={data.elevator_pitch} />
-              </div>
-              <p className="text-white/90 text-lg leading-relaxed font-medium">{data.elevator_pitch}</p>
-            </div>
-          )}
-          {data.about_section && (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300/70">About Section</div>
-                <CopyButton text={data.about_section} />
-              </div>
-              <p className="text-white/80 leading-relaxed">{data.about_section}</p>
-            </div>
-          )}
-          {data.email_signature_tagline && (
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4 flex items-center justify-between gap-4">
-              <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 mb-1">Email Signature</div>
-                <p className="text-white/70 italic text-sm">"{data.email_signature_tagline}"</p>
-              </div>
-              <CopyButton text={data.email_signature_tagline} />
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Pillars */}
-      {tab === 'pillars' && (
-        <div className="grid md:grid-cols-2 gap-4">
-          {pillars.map((p, i) => (
-            <div key={i} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 space-y-2">
-              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-300/70">Pillar {i + 1}</div>
-              <div className="font-black text-white text-lg">{p.pillar}</div>
-              <div className="text-blue-300 font-semibold text-sm">{p.headline}</div>
-              <p className="text-white/60 text-sm leading-relaxed">{p.description}</p>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* CTAs */}
-      {tab === 'cta' && (
-        <div className="grid md:grid-cols-2 gap-3">
-          {ctas.map((cta, i) => (
-            <div key={i} className="rounded-xl border border-white/10 bg-white/[0.03] p-4 flex items-center justify-between gap-4">
-              <div>
-                <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1">CTA {i + 1}</div>
-                <div className="text-white/90 font-semibold">{cta}</div>
-              </div>
-              <CopyButton text={cta} />
-            </div>
-          ))}
-        </div>
-      )}
+      {tab === 'foundations' && <FoundationsTab data={data} />}
+      {tab === 'voice'       && <VoiceTab       data={data} />}
+      {tab === 'email'       && <EmailTab        data={data} />}
+      {tab === 'pitch'       && <PitchTab        data={data} />}
+      {tab === 'social'      && <SocialTab       data={data} />}
+      {tab === 'pillars'     && <PillarsTab      data={data} />}
+      {tab === 'cta'         && <CTAsTab         data={data} />}
     </div>
   );
 }

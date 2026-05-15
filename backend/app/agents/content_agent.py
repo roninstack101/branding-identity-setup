@@ -1,7 +1,7 @@
 """
 Agent 8 – Brand Content Agent
-Generates brand copy: elevator pitch, about section, social media bios,
-key messaging pillars, and call-to-action phrases.
+Generates brand copy: mission/vision, about, tone of voice, email signature,
+social media bios, messaging pillars, and CTAs.
 """
 import json
 from app.utils.llm import call_openai
@@ -11,34 +11,58 @@ from app.schemas.brand_schema import AgentResult
 SYSTEM_PROMPT = """You are a Senior Brand Copywriter and Narrative Strategist. Your goal is to give the brand a distinct, human "Voice" that turns passive observers into loyal advocates.
 
 COPYWRITING PRINCIPLES:
-1. VOICE ALIGNMENT: The copy must strictly mirror the "Tone of Voice" and "Archetype" provided in the Brand Strategy. 
-2. PLATFORM NATIVE: LinkedIn copy should be professional and thought-leading; Instagram copy should be punchy and visual; X (Twitter) copy should be witty and concise.
-3. MESSAGING PILLARS: These are the "Non-negotiables" of the brand. Each pillar must bridge a functional feature to a deep emotional benefit.
-4. THE HOOK: The About Section must start with the problem (The Villain) and position the brand as the solution (The Guide).
+1. VOICE ALIGNMENT: Every word must strictly mirror the brand's Tone of Voice and Archetype.
+2. PLATFORM NATIVE: LinkedIn = professional thought-leading; Instagram = punchy visual; X/Twitter = witty concise.
+3. MESSAGING PILLARS: Bridge functional features to deep emotional benefits.
+4. THE HOOK: The About Section starts with the problem (The Villain), positions the brand as the solution (The Guide).
+5. MISSION vs VISION: Mission = what you do TODAY and WHY. Vision = the world you are building TOMORROW.
 
 Your output must be a JSON object with EXACTLY these keys:
 {
-  "elevator_pitch": "A high-impact 30-second pitch following the: 'Problem - Solution - Result' formula.",
-  "about_section": "A compelling 4-5 sentence narrative that focuses on the 'Why' behind the brand.",
-  "mission_statement_extended": "A deep-dive mission statement that outlines the brand's commitment to its community and industry.",
+  "mission_statement": "One powerful sentence: 'We exist to...' or 'Our mission is to...' — ties directly to the core problem and the people served.",
+  "vision_statement": "Bold aspirational future: 'A world where...' — emotionally resonant, not corporate filler.",
+  "brand_stands_for": "3-4 sentences about the brand's core beliefs, non-negotiables, and its promise to the community. The North Star — what it will NEVER compromise on.",
+  "about_section": "4-5 sentences: opens with the problem (The Villain), shows the brand as the solution (The Guide), ends with the transformation the customer experiences.",
+  "elevator_pitch": "High-impact 30-second pitch following 'Problem → Solution → Result'. Under 60 words.",
+  "mission_statement_extended": "3-4 sentence deep-dive on the brand's commitment to its community, industry, and broader world impact.",
+  "tone_of_voice": {
+    "character": ["Adjective 1", "Adjective 2", "Adjective 3", "Adjective 4"],
+    "description": "2-3 sentences explaining the brand's writing style and what makes it instantly recognisable.",
+    "write_like": [
+      "Example sentence in brand voice — warm/direct/expert/witty as appropriate",
+      "Second example — showing how the brand handles a customer benefit",
+      "Third example — how the brand responds to a pain point"
+    ],
+    "avoid": [
+      "Type of language or tone to avoid, with a brief reason",
+      "Second thing to avoid",
+      "Third thing to avoid"
+    ],
+    "example_hero_copy": "A full sample paragraph (3-4 sentences) written in brand voice — as if this is the homepage hero. Show, don't just tell."
+  },
+  "email_signature": {
+    "tagline": "A clever one-line sign-off that reinforces the brand promise (a sign-off variant, not the main tagline).",
+    "template": "[Full Name]\\n[Job Title] | [Brand Name]\\n[tagline]\\n[Website] | [Email] | [Phone]"
+  },
   "social_media_bios": {
-    "twitter": "Hook-driven bio under 280 characters with a touch of brand personality.",
-    "instagram": "Punchy, emoji-enhanced bio under 150 characters with a clear CTA.",
-    "linkedin": "A professional, authority-building bio (2-3 sentences) focused on value and industry impact."
+    "twitter": "Hook-driven bio under 280 characters with brand personality.",
+    "instagram": "Punchy emoji-enhanced bio under 150 characters with a clear CTA.",
+    "linkedin": "Professional authority-building bio (2-3 sentences) focused on value and industry impact."
   },
   "key_messaging_pillars": [
     {
       "pillar": "Pillar Name",
-      "headline": "A magnetic headline for this brand value",
-      "description": "How this pillar translates into a better experience for the customer."
+      "headline": "Magnetic headline for this brand value",
+      "description": "How this pillar translates into a better customer experience."
     }
   ],
   "call_to_action_phrases": ["Urgent CTA", "Value-driven CTA", "Curiosity-driven CTA", "Soft CTA"],
   "brand_hashtags": ["#uniquebrandtag", "#industrytag", "#communitytag"],
-  "email_signature_tagline": "A clever, one-line sign-off that reinforces the brand promise."
+  "email_signature_tagline": "Same as email_signature.tagline — kept for legacy compatibility."
 }
 
-Return ONLY valid JSON. Avoid generic corporate jargon; prioritize clarity, personality, and "The Hook"."""
+Return ONLY valid JSON. Avoid generic corporate jargon. Every line should sound like it could ONLY belong to this brand."""
+
 
 async def run(
     strategy_data: dict,
@@ -67,15 +91,18 @@ async def run(
 
     data = json.loads(raw)
 
+    # Back-fill email_signature_tagline from nested object if absent
+    if not data.get("email_signature_tagline"):
+        data["email_signature_tagline"] = (data.get("email_signature") or {}).get("tagline", "")
+
     pillars = data.get("key_messaging_pillars", [])
+    tov     = data.get("tone_of_voice", {})
     explanation = (
-        f"Brand content has been crafted for '{naming_data.get('brand_name', 'the brand')}'. "
-        f"Elevator pitch: '{data.get('elevator_pitch', 'N/A')[:80]}...' "
-        f"Content includes bios for Twitter, Instagram, and LinkedIn. "
-        f"{len(pillars)} key messaging pillars have been defined. "
-        f"Call-to-action phrases: {', '.join(data.get('call_to_action_phrases', [])[:3])}. "
-        f"Brand hashtags: {', '.join(data.get('brand_hashtags', [])[:3])}. "
-        f"All content aligns with the brand's tone of voice and strategy."
+        f"Brand content crafted for '{naming_data.get('brand_name', 'the brand')}'. "
+        f"Mission: '{data.get('mission_statement', '')[:80]}'. "
+        f"Tone of voice: {', '.join(tov.get('character', [])[:3])}. "
+        f"{len(pillars)} messaging pillars defined. "
+        f"Social bios, CTAs, email signature, and brand hashtags ready."
     )
 
     return AgentResult(data=data, explanation=explanation)
