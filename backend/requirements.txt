@@ -1,7 +1,7 @@
 fastapi
 uvicorn[standard]
 sqlalchemy
-aiosqlite
+aioodbc
 alembic
 pydantic>=2.7,<3
 pydantic-settings

@@ -154,7 +154,12 @@ BIDS_AI_2/
 GROQ_API_KEY=your_api_key_here
 LLM_MODEL=llama-3.3-70b-versatile
 HUGGINGFACE_API_KEY=your_hf_token
-DATABASE_URL=sqlite+aiosqlite:///./brand_builder.db
+DB_HOST=localhost
+DB_PORT=1433
+DB_USER=sa
+DB_PASSWORD=YourStrong@Passw0rd
+DB_NAME=brand_builder
+DB_DRIVER=ODBC Driver 17 for SQL Server
 FRONTEND_URL=http://127.0.0.1:5173
 ```
 
