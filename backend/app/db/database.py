@@ -17,11 +17,12 @@ DB_PORT = os.getenv("DB_PORT", "1433")
 DB_USER = os.getenv("DB_USER", "sa")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "brand_builder")
-DB_DRIVER = os.getenv("DB_DRIVER", "ODBC Driver 17 for SQL Server")
+DB_DRIVER = os.getenv("DB_DRIVER", "ODBC Driver 18 for SQL Server")
+DB_TRUST_SERVER_CERTIFICATE = os.getenv("DB_TRUST_SERVER_CERTIFICATE", "yes")
 
 _odbc_params = quote_plus(
     f"DRIVER={{{DB_DRIVER}}};SERVER={DB_HOST},{DB_PORT};DATABASE={DB_NAME};"
-    f"UID={DB_USER};PWD={DB_PASSWORD}"
+    f"UID={DB_USER};PWD={DB_PASSWORD};TrustServerCertificate={DB_TRUST_SERVER_CERTIFICATE}"
 )
 DATABASE_URL = f"mssql+aioodbc:///?odbc_connect={_odbc_params}"
 

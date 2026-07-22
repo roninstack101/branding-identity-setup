@@ -1,6 +1,6 @@
 """
 SQLAlchemy ORM models for the Brand Identity Builder.
-Tables: projects, agent_outputs, brand_kits
+Tables: bids_projects, bids_agent_outputs, bids_brand_kits
 """
 import uuid
 from datetime import datetime, timezone
@@ -13,8 +13,8 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     JSON,
+    Uuid,
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base
@@ -25,9 +25,9 @@ def _utcnow() -> datetime:
 
 
 class Project(Base):
-    __tablename__ = "projects"
+    __tablename__ = "bids_projects"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4)
     user_id = Column(String(128), nullable=True, index=True)
     idea = Column(Text, nullable=False)
     current_step = Column(Integer, default=0)
@@ -43,11 +43,11 @@ class Project(Base):
 
 
 class AgentOutput(Base):
-    __tablename__ = "agent_outputs"
+    __tablename__ = "bids_agent_outputs"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4)
     project_id = Column(
-        UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+        Uuid, ForeignKey("bids_projects.id", ondelete="CASCADE"), nullable=False, index=True
     )
     agent_name = Column(String(64), nullable=False, index=True)
     output_json = Column(JSON, nullable=False)
@@ -59,12 +59,12 @@ class AgentOutput(Base):
 
 
 class BrandKit(Base):
-    __tablename__ = "brand_kits"
+    __tablename__ = "bids_brand_kits"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4)
     project_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("projects.id", ondelete="CASCADE"),
+        Uuid,
+        ForeignKey("bids_projects.id", ondelete="CASCADE"),
         nullable=False,
         unique=True,
     )
