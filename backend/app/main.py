@@ -38,16 +38,17 @@ app = FastAPI(
 )
 
 # CORS
-frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+_frontend_urls = [
+    url.strip()
+    for url in os.getenv("FRONTEND_URL", "http://localhost:5173").split(",")
+    if url.strip()
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        frontend_url,
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
+        *_frontend_urls,
+        "https://branding.wogom.ai",
+        "https://d3r6o7a7i6j322.cloudfront.net",
     ],
     allow_credentials=True,
     allow_methods=["*"],
